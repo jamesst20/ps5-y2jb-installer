@@ -1,0 +1,4 @@
+# The Windows build is shipped as a plain ZIP, so it must not depend on the Visual C++
+# redistributable being installed. Static CRT keeps the executable self-contained.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

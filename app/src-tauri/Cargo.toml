@@ -1,0 +1,24 @@
+[package]
+name = "y2jb-installer"
+version = "1.0.0"
+description = "Y2JB Installer desktop app"
+edition = "2021"
+license = "GPL-3.0-or-later"
+rust-version = "1.77"
+
+[lib]
+name = "y2jb_installer_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+if-addrs = "0.13"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+sha2 = "0.10"
+hex = "0.4"
+tokio = { version = "1", features = ["fs", "io-util", "macros", "rt"] }

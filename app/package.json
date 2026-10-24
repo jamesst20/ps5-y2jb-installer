@@ -1,0 +1,18 @@
+{
+  "name": "y2jb-installer-app",
+  "private": true,
+  "version": "1.0.0",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "predev": "node ../scripts/prepare-build.mjs",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

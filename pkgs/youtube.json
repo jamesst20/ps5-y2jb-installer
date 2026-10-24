@@ -1,0 +1,106 @@
+{
+  "builds": [
+    {
+      "build": "v01.000.003",
+      "base": {
+        "url": "https://gst.prod.dl.playstation.net/gst/prod/00/PPSA01650_00/app/pkg/6/f_cca4b4736587963783ca48003630bc1234eedb0f9248571bcb0328d0a0a5da89/UP4381-PPSA01650_00-YOUTUBESIEA00000.pkg",
+        "filename": "UP4381-PPSA01650_00-YOUTUBESIEA00000.pkg",
+        "size": 81854464,
+        "sha256": "72281c74406c91d18675883d0a8facab2fe5f75f4b56d0519a9a57417817fe97"
+      },
+      "sc": {
+        "usa": {
+          "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01650_00/app/info/7/f_cfbc3abdcd214584551586f604b4d8538750889cd41704788e5f24bbc6685327/UP4381-PPSA01650_00-YOUTUBESIEA00000_sc.pkg",
+          "filename": "UP4381-PPSA01650_00-YOUTUBESIEA00000_sc.pkg",
+          "size": 25690112,
+          "sha256": "ec6cdc155fc99d8f7eabdbf3534e2f0e868b90b1d0d3e9f6c0a1290a402d61d0",
+          "package_digest": "D428DCEAC4DA3D439DF61E8344BDDCCFFC57FEFE1431A32C2D2A31AF390E3673"
+        },
+        "europe": {
+          "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01651_00/app/info/7/f_642d948a1fce26e2bfb058a05de64d66fddda8dd1107bce613092e6a473e58a5/EP4381-PPSA01651_00-YOUTUBESIEE00000_sc.pkg",
+          "filename": "EP4381-PPSA01651_00-YOUTUBESIEE00000_sc.pkg",
+          "size": 25690112,
+          "sha256": "eeeb2c520848c403c89c7d7aa4ca7e873cbfb0c2dd7c7db017a0d6bda40910da",
+          "package_digest": "D807BE24498C52FE8A65073181A395F3AABFD05B211BE764E2D200DC74904537"
+        },
+        "japan": {
+          "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01652_00/app/info/7/f_f9dbeb331803c693bb35880c27eec20fc4f493344f786df9cd3697d6e384bb23/JA0004-PPSA01652_00-YOUTUBESIEJA0000_sc.pkg",
+          "filename": "JA0004-PPSA01652_00-YOUTUBESIEJA0000_sc.pkg",
+          "size": 25690112,
+          "sha256": "844c6164c259561d214bc408fdf44066e133062a4a976adcc086a9a49dc3de49",
+          "package_digest": "30A1AD8C89436118332329704D66B9214BEDDCBA16EBF531B00D61A51BA67E0E"
+        }
+      }
+    },
+    {
+      "build": "v01.000.030",
+      "base": {
+        "url": "https://gst.prod.dl.playstation.net/gst/prod/00/PPSA01650_00/app/pkg/26/f_4c22a24a4e6a211fedf26a4d8f2b69b5e75494623465d461b68b55b51717ed94/UP4381-PPSA01650_00-YOUTUBESIEA00000.pkg",
+        "filename": "UP4381-PPSA01650_00-YOUTUBESIEA00000.pkg",
+        "size": 75825152,
+        "sha256": "1bc7d74203db68011a267b81422394ff02218e389c35b979ae22690ab38bd3a0"
+      },
+      "sc": {
+        "usa": {
+          "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01650_00/app/info/27/f_007bf7912dd87501f2f6ac5bd4c8f640a5314879ad3d561ef1e12c3110a9a207/UP4381-PPSA01650_00-YOUTUBESIEA00000_sc.pkg",
+          "filename": "UP4381-PPSA01650_00-YOUTUBESIEA00000_sc.pkg",
+          "size": 25690112,
+          "sha256": "65b9b067baae372ff4c043807382bd24824d43055fde03fe7ce6147b5c8deea0",
+          "package_digest": "EDF477B20F2BB6852B631297EA5833CE1976879CF429CDC7D80B241564F4CCFC"
+        },
+        "europe": {
+          "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01651_00/app/info/27/f_2c74103fea8b64fbcbece44bb8daa13d766f3443ef81bd5c5c8648421d93d4ce/EP4381-PPSA01651_00-YOUTUBESIEE00000_sc.pkg",
+          "filename": "EP4381-PPSA01651_00-YOUTUBESIEE00000_sc.pkg",
+          "size": 25690112,
+          "sha256": "5b0e29c3904e0d04da5b77eab728307772290db2ea647c01f26db64d5e934ca7",
+          "package_digest": "98668DD37F57AF726A17FD69C78B93B3829DA090F1C349CBDCEABB05A83C5939"
+        },
+        "japan": {
+          "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01652_00/app/info/27/f_639eeccf00d38ca932ee585154aebc9d7d0fda1242fdc02d4485d1dbc2a3753a/JA0004-PPSA01652_00-YOUTUBESIEJA0000_sc.pkg",
+          "filename": "JA0004-PPSA01652_00-YOUTUBESIEJA0000_sc.pkg",
+          "size": 25690112,
+          "sha256": "89c1ab80ead0323732a67ae91bd00f87c6db044a25fdbcd7dfa4f970051a4271",
+          "package_digest": "2885116E76DF53C32329A3F3BE7259B6C2CE96EECFB84D7D4352101F10C6517D"
+        }
+      }
+    },
+    {
+      "build": "v01.009.253",
+      "base": {
+        "url": "https://gst.prod.dl.playstation.net/gst/prod/00/PPSA01650_00/app/pkg/31/f_cf9b0d9f41101ed200fba16ee0218bcaab4c1a01bca85ba4302534dc5aa29fee/UP4381-PPSA01650_00-YOUTUBESIEA00000.pkg",
+        "filename": "UP4381-PPSA01650_00-YOUTUBESIEA00000.pkg",
+        "size": 81330176,
+        "sha256": "624ab97278a516c893b308a06f379435a184ef3634bad990e5a0cec5af9795f6"
+      },
+      "sc": {
+        "usa": {
+          "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01650_00/app/info/32/f_5ed0f287cd16d18925ca5f57e2a42fd438560dc44cb42f2cf66ea817794b4320/UP4381-PPSA01650_00-YOUTUBESIEA00000_sc.pkg",
+          "filename": "UP4381-PPSA01650_00-YOUTUBESIEA00000_sc.pkg",
+          "size": 25690112,
+          "sha256": "84a268f0bc88cacbbbe0ca6c5d9f54be81890be6ea377c1c91be821eb6e2cefb",
+          "package_digest": "D68D369DFEB14E2416AD0AA80AC2F61DD0C25545D0550DDC689E4234EF5A5458"
+        },
+        "europe": {
+          "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01651_00/app/info/32/f_6ed4cf5926b476e3c73513a8834cfc0f86f55a4f10d1f8d965730978429799b3/EP4381-PPSA01651_00-YOUTUBESIEE00000_sc.pkg",
+          "filename": "EP4381-PPSA01651_00-YOUTUBESIEE00000_sc.pkg",
+          "size": 25690112,
+          "sha256": "b644fc1ac23c8933c70cf307760d25111cac1c1651762e62838034ed510f1da5",
+          "package_digest": "978AB3D220D59F32D67D552E96200F637220B106CF3719FB28D60B616AA51F57"
+        },
+        "japan": {
+          "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01652_00/app/info/32/f_ce49a186b29b3b264440ffa2e49d64797b95db975d7d89c328a54bf5a43f5c86/JA0004-PPSA01652_00-YOUTUBESIEJA0000_sc.pkg",
+          "filename": "JA0004-PPSA01652_00-YOUTUBESIEJA0000_sc.pkg",
+          "size": 25690112,
+          "sha256": "abbb531a1d0117314ae8284be4be670b1d054983de53aebdfbab2b55e840bb40",
+          "package_digest": "D4BE8EA7B1A585929FF75EFE67BFC8CFA8D9E1B9E060BE25DF4E4745F919C1E4"
+        }
+      }
+    }
+  ],
+  "firmware": [
+    { "from": "4.03", "to": "12.59", "build": "v01.000.003" },
+    { "from": "12.60", "to": "13.39", "build": "v01.000.030" },
+    { "from": "13.40", "to": "13.60", "build": "v01.009.253" }
+  ],
+  "unsupported_firmware": ["11.40"]
+}

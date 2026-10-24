@@ -1,0 +1,3 @@
+[submodule "third_party/offact"]
+	path = third_party/offact
+	url = https://github.com/ps5-payload-dev/offact
