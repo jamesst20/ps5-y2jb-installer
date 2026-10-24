@@ -7,6 +7,7 @@
 - Experimental Android target. The full workflow is verified on Pixel 9 with Android 17; connection and payload sending are verified on OnePlus 13 with Android 16.
 - System-aware light and dark themes.
 - AppImage releases now include GitHub Releases update information and a matching `.zsync` file for AppImageUpdate.
+- Compact scaling for narrow mobile viewports.
 
 ### Changed
 

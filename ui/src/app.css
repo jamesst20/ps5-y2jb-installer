@@ -96,4 +96,18 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+
+  /* Narrow Android viewports (e.g. 360dp) otherwise make the desktop layout
+     feel oversized. Tailwind spacing and type sizes are rem-based. */
+  @media (max-width: 380px) {
+    html {
+      font-size: 14px;
+    }
+  }
+
+  @media (max-width: 340px) {
+    html {
+      font-size: 13px;
+    }
+  }
 }
