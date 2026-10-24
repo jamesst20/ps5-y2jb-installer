@@ -1,6 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <script>
   import { onMount } from 'svelte';
+  import { ModeWatcher } from 'mode-watcher';
   import PlayIcon from '@lucide/svelte/icons/play';
   import CheckCircle2Icon from '@lucide/svelte/icons/check-circle-2';
   import { Card, CardContent } from '$lib/components/ui/card/index.js';
@@ -14,6 +15,7 @@
   import Y2jbStep from '$lib/components/Y2jbStep.svelte';
   import UpdatesStep from '$lib/components/UpdatesStep.svelte';
   import RebootBar from '$lib/components/RebootBar.svelte';
+  import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 
   const installer = new Installer();
 
@@ -22,6 +24,8 @@
     return () => installer.stop();
   });
 </script>
+
+<ModeWatcher disableHeadScriptInjection />
 
 <div class="mx-auto flex max-w-6xl flex-col gap-6 px-5 pt-8 {installer.rebootPending ? 'pb-28' : 'pb-8'}">
   <header class="flex items-center gap-3 px-1">
@@ -32,6 +36,7 @@
       <h1 class="text-base font-semibold leading-tight">{t.app.title}</h1>
       <p class="text-xs text-muted-foreground">{t.app.subtitle} · v{installer.appVersion}</p>
     </div>
+    <ThemeToggle />
   </header>
 
   <ConnectionCard {installer} />

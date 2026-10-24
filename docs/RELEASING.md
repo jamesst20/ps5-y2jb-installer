@@ -22,15 +22,16 @@
    | Workflow | Artifact |
    |---|---|
    | `build-macos.yml` | Universal DMG |
-   | `build-linux.yml` | AppImage and `.deb` for amd64 and arm64 |
+   | `build-linux.yml` | AppImage, AppImage `.zsync`, and `.deb` for amd64 and arm64 |
    | `build-windows.yml` | Windows x64 ZIP |
 
 4. Check the draft release:
 
-   - All platform artifacts and `SHA256SUMS-*` files are attached.
+   - All platform artifacts, AppImage `.zsync` files, and `SHA256SUMS-*` files are attached.
    - Checksums match the artifacts.
    - The application reports the expected version.
    - The DMG, Windows ZIP, and Linux packages launch and connect to a console.
+   - AppImageUpdate can discover the latest AppImage from the GitHub release.
 
 5. Publish the release.
 

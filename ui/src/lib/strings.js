@@ -25,6 +25,7 @@ export const strings = {
     rebootRequired: 'A reboot is required',
     rebootRequiredHint: 'Account activation and sign-in take effect after restarting. You can finish the remaining steps first.',
     rebootNow: 'Reboot now',
+    toggleTheme: 'Toggle theme',
   },
 
   connection: {

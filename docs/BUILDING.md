@@ -31,7 +31,7 @@ rustup target add aarch64-apple-darwin x86_64-apple-darwin
 **Linux (Debian/Ubuntu)**
 
 ```sh
-sudo apt-get install -y build-essential curl wget file unzip patchelf tcl gnupg \
+sudo apt-get install -y build-essential curl wget file unzip patchelf tcl gnupg zsync \
   libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev
 ```
 
@@ -101,7 +101,13 @@ CI=true npx tauri build --target universal-apple-darwin --bundles dmg
 ```sh
 cd app
 npx tauri build --bundles appimage,deb
+cd ..
+scripts/appimage-update.sh x86_64 amd64   # use aarch64/aarch64 on arm64
 ```
+
+`scripts/appimage-update.sh` repacks the AppImage with GitHub Releases update
+information and creates the matching `.zsync` file. It is also run by the Linux
+release workflow.
 
 **Windows executable**
 

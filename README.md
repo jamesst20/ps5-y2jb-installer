@@ -24,6 +24,7 @@ The console does not need outbound internet access. The PC fetches Sony packages
 - In-place YouTube update blocking with timestamped `appinfo.db` backups.
 - LAN discovery and manual console connection.
 - PC-side download cache with per-artifact status and cleanup.
+- System-aware light and dark themes.
 
 Each setup step is independent and can be repeated safely.
 
@@ -39,9 +40,12 @@ Each setup step is independent and can be repeated safely.
 
 - Windows 10 1803+ or Windows 11, with the WebView2 runtime.
 - macOS 11 or later.
-- Linux with glibc 2.35+ (Ubuntu 22.04 baseline), x64 or arm64.
+- Linux with glibc 2.35+ (Ubuntu 22.04 baseline), x64 or arm64, plus WebKitGTK 4.1, GTK 3, librsvg, and libappindicator.
 - Internet access and a network route to the console.
 - No administrator rights are required on Windows.
+
+The AppImage is not fully self-contained; it uses the host glibc and graphical runtime
+libraries. It is built against the Ubuntu 22.04 baseline.
 
 ## Installation
 
@@ -63,7 +67,7 @@ Extract the ZIP and run `y2jb-installer.exe`. No installer or administrator righ
 
 ### Linux
 
-Make the AppImage executable and run it, or install the `.deb` package. The AppImage requires FUSE; use `--appimage-extract-and-run` if FUSE is unavailable.
+Make the AppImage executable and run it, or install the `.deb` package. The AppImage requires FUSE; use `--appimage-extract-and-run` if FUSE is unavailable. The AppImage includes GitHub Releases update information and can be updated with AppImageUpdate; the matching `.zsync` file is published next to it.
 
 ## Usage
 
