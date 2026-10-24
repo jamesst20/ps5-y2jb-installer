@@ -96,11 +96,11 @@ cd app
 CI=true npx tauri build --target universal-apple-darwin --bundles dmg
 ```
 
-**Linux AppImage and deb**
+**Linux AppImage**
 
 ```sh
 cd app
-npx tauri build --bundles appimage,deb
+npx tauri build --bundles appimage
 cd ..
 scripts/appimage-update.sh x86_64 amd64   # use aarch64/aarch64 on arm64
 ```

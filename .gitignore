@@ -5,9 +5,10 @@ app/node_modules/
 app/src-tauri/target/
 app/src-tauri/gen/schemas/
 *.partial
+*.keystore
+*.jks
 .DS_Store
 
 # Release artifacts assembled in the workspace (CI and local packaging).
 y2jb-installer_*/
 y2jb-installer_*.zip
-SHA256SUMS-*.txt

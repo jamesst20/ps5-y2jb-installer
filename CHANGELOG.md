@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Signed universal Android APK in release artifacts.
+- Android build documentation and signing instructions.
+
+### Changed
+
+- Release CI now builds the PS5 payload once and shares it across macOS, Linux, Windows, and Android jobs.
+- The release workflow can refresh assets on an existing release without moving its tag.
+
 ## 1.1.0 — 2026-10-24
 
 ### Added

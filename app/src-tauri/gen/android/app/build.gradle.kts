@@ -14,6 +14,11 @@ val tauriProperties = Properties().apply {
     }
 }
 
+val releaseKeystore = System.getenv("Y2JB_ANDROID_KEYSTORE")
+val releaseStorePassword = System.getenv("Y2JB_ANDROID_STORE_PASSWORD")
+val releaseKeyAlias = System.getenv("Y2JB_ANDROID_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("Y2JB_ANDROID_KEY_PASSWORD")
+
 android {
     compileSdk = 36
     namespace = "dev.y2jb.installer"
@@ -24,6 +29,21 @@ android {
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        if (
+            releaseKeystore != null &&
+            releaseStorePassword != null &&
+            releaseKeyAlias != null &&
+            releaseKeyPassword != null
+        ) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -39,6 +59,11 @@ android {
             }
         }
         getByName("release") {
+            // The payload API is plain HTTP on the local network.
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
+            if (signingConfigs.names.contains("release")) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             optimization {
                enable = true
             }

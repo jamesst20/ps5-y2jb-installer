@@ -1,0 +1,462 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      sdk_tag:
+        description: PS5 payload SDK tag (empty = latest)
+        required: false
+        type: string
+      release_tag:
+        description: Existing release tag to refresh (empty = Actions artifacts only)
+        required: false
+        type: string
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  payload:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install the payload toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential curl wget file unzip tar tcl gnupg ca-certificates
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key |
+            sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] https://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME}-18 main" |
+            sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-18 lld-18 llvm-18
+          echo "LLVM_CONFIG=/usr/lib/llvm-18/bin/llvm-config" >> "$GITHUB_ENV"
+
+      - name: Check the version
+        run: |
+          node scripts/version.mjs --check
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            test "$GITHUB_REF_NAME" = "v$(cat VERSION)"
+          fi
+
+      - name: Cache payload dependencies
+        uses: actions/cache@v6
+        with:
+          path: build/prefix
+          key: payload-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/build_deps.sh') }}
+
+      - name: Resolve the latest PS5 payload SDK
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SDK_TAG: ${{ inputs.sdk_tag }}
+        run: node scripts/latest-sdk.mjs
+
+      - name: Install the PS5 payload SDK
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/ps5-payload-sdk.zip" "$SDK_URL"
+          echo "$SDK_SHA256  $RUNNER_TEMP/ps5-payload-sdk.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/ps5-payload-sdk.zip" -d "$RUNNER_TEMP"
+          echo "PS5_PAYLOAD_SDK=$RUNNER_TEMP/ps5-payload-sdk" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/ps5-payload-sdk/bin/prospero-clang" --version
+
+      - name: Build and test the payload
+        run: |
+          scripts/build_deps.sh
+          make payload
+          make test
+
+      - uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: error
+          name: ps5-payload
+          path: build/y2jb-installer.elf
+
+  macos:
+    needs: payload
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            ui/package-lock.json
+            app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ps5-payload
+          path: build
+
+      - name: Check the version
+        run: node scripts/version.mjs --check
+
+      - name: Install app dependencies
+        run: |
+          npm ci --prefix ui
+          npm ci --prefix app
+
+      - name: Test the app
+        run: |
+          npm --prefix ui run check
+          npm --prefix ui run build
+          cargo fmt --manifest-path app/src-tauri/Cargo.toml --all -- --check
+          cargo clippy --manifest-path app/src-tauri/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path app/src-tauri/Cargo.toml
+
+      - name: Build the universal DMG
+        env:
+          Y2JB_PAYLOAD_PREBUILT: "1"
+        run: |
+          cd app
+          npx tauri build --target universal-apple-darwin --bundles dmg
+
+      - name: Normalize the DMG name
+        run: |
+          version="$(cat VERSION)"
+          cd app/src-tauri/target/universal-apple-darwin/release/bundle/dmg
+          file="$(find . -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+          if [[ -z "$file" ]]; then
+            echo "DMG was not produced" >&2
+            exit 1
+          fi
+          target="Y2JB.Installer_${version}_macos-universal.dmg"
+          if [ "$(basename "$file")" != "$target" ]; then
+            mv "$file" "$target"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: error
+          name: release-macos-universal
+          path: app/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+
+  linux:
+    needs: payload
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            arch: amd64
+          - runner: ubuntu-22.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            ui/package-lock.json
+            app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ps5-payload
+          path: build
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential curl wget file unzip patchelf tcl zsync \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev
+
+      - name: Check the version
+        run: node scripts/version.mjs --check
+
+      - name: Install app dependencies
+        run: |
+          npm ci --prefix ui
+          npm ci --prefix app
+
+      - name: Test the app
+        run: |
+          npm --prefix ui run check
+          npm --prefix ui run build
+          cargo fmt --manifest-path app/src-tauri/Cargo.toml --all -- --check
+          cargo clippy --manifest-path app/src-tauri/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path app/src-tauri/Cargo.toml
+
+      - name: Build the AppImage
+        env:
+          Y2JB_PAYLOAD_PREBUILT: "1"
+        run: |
+          cd app
+          npx tauri build --bundles appimage
+
+      - name: Add AppImage update information
+        run: |
+          case "${{ matrix.arch }}" in
+            amd64) tool_arch=x86_64; asset_arch=amd64 ;;
+            arm64) tool_arch=aarch64; asset_arch=aarch64 ;;
+            *) echo "unsupported architecture"; exit 1 ;;
+          esac
+          bash scripts/appimage-update.sh "$tool_arch" "$asset_arch"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: error
+          name: release-linux-${{ matrix.arch }}
+          path: |
+            app/src-tauri/target/release/bundle/appimage/*.AppImage
+            app/src-tauri/target/release/bundle/appimage/*.AppImage.zsync
+
+  windows:
+    needs: payload
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            ui/package-lock.json
+            app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ps5-payload
+          path: build
+
+      - name: Check the version
+        shell: pwsh
+        run: |
+          node scripts/version.mjs --check
+          if ($env:GITHUB_REF -like 'refs/tags/*') {
+            $version = (Get-Content VERSION -Raw).Trim()
+            if ($env:GITHUB_REF_NAME -ne "v$version") {
+              throw "release tag $env:GITHUB_REF_NAME does not match VERSION $version"
+            }
+          }
+
+      - name: Install app dependencies
+        shell: pwsh
+        run: |
+          npm ci --prefix ui
+          npm ci --prefix app
+
+      - name: Test the app
+        shell: pwsh
+        run: |
+          npm --prefix ui run check
+          npm --prefix ui run build
+          Push-Location app/src-tauri
+          cargo fmt --all -- --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+          Pop-Location
+
+      - name: Build the executable
+        shell: pwsh
+        env:
+          Y2JB_PAYLOAD_PREBUILT: "1"
+        run: |
+          Push-Location app
+          npx tauri build --no-bundle
+          Pop-Location
+          if (-not (Test-Path "app/src-tauri/target/release/y2jb-installer.exe")) {
+            throw "the executable was not produced"
+          }
+
+      - name: Package the ZIP
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          $name = "y2jb-installer_${version}_windows-x64"
+          New-Item -ItemType Directory -Force -Path $name | Out-Null
+          Copy-Item "app/src-tauri/target/release/y2jb-installer.exe" "$name/"
+          Copy-Item "packaging/windows/README.txt" "$name/"
+          Compress-Archive -Path "$name/*" -DestinationPath "$name.zip" -Force
+
+      - uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: error
+          name: release-windows-x64
+          path: y2jb-installer_*_windows-x64.zip
+
+  android:
+    needs: payload
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            ui/package-lock.json
+            app/package-lock.json
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;27.2.12479018"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ps5-payload
+          path: build
+
+      - name: Set the Android SDK paths
+        run: |
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/.android/sdk}}"
+          {
+            echo "ANDROID_HOME=$sdk_root"
+            echo "ANDROID_SDK_ROOT=$sdk_root"
+            echo "NDK_HOME=$sdk_root/ndk/27.2.12479018"
+          } >> "$GITHUB_ENV"
+
+      - name: Check the version
+        run: node scripts/version.mjs --check
+
+      - name: Install app dependencies
+        run: |
+          npm ci --prefix ui
+          npm ci --prefix app
+
+      - name: Prepare the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [[ -z "$KEYSTORE_BASE64" || -z "$STORE_PASSWORD" || -z "$KEY_ALIAS" || -z "$KEY_PASSWORD" ]]; then
+            echo "Android signing secrets are missing. Set ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD." >&2
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/y2jb-release.keystore"
+          chmod 600 "$RUNNER_TEMP/y2jb-release.keystore"
+          {
+            echo "Y2JB_ANDROID_KEYSTORE=$RUNNER_TEMP/y2jb-release.keystore"
+            echo "Y2JB_ANDROID_STORE_PASSWORD=$STORE_PASSWORD"
+            echo "Y2JB_ANDROID_KEY_ALIAS=$KEY_ALIAS"
+            echo "Y2JB_ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Build the universal APK
+        env:
+          Y2JB_PAYLOAD_PREBUILT: "1"
+        run: |
+          cd app
+          npx tauri android build --apk --ci
+          cd ..
+          version="$(cat VERSION)"
+          apk="app/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk"
+          name="y2jb-installer_${version}_android-universal.apk"
+          cp "$apk" "$name"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$name"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$name"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: error
+          name: release-android-universal
+          path: y2jb-installer_*_android-universal.apk
+
+  release:
+    needs: [macos, linux, windows, android]
+    if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-assets
+
+      - name: Verify the release tag
+        if: inputs.release_tag != ''
+        run: |
+          expected="v$(cat VERSION)"
+          if [ "${{ inputs.release_tag }}" != "$expected" ]; then
+            echo "input release_tag must be $expected" >&2
+            exit 1
+          fi
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+        run: |
+          TAG="$RELEASE_TAG"
+          gh release view "$TAG" >/dev/null 2>&1 ||
+            gh release create "$TAG" --draft --title "Y2JB Installer $TAG" --generate-notes
+          gh release upload "$TAG" release-assets/* --clobber

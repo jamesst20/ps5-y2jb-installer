@@ -24,20 +24,23 @@ if [[ ! -x "$tool" ]]; then
   chmod +x "$tool"
 fi
 
-update_info="gh-releases-zsync|jamesst20|ps5-y2jb-installer|latest|Y2JB.Installer_*_${asset_arch}.AppImage.zsync"
+version="$(cat VERSION)"
+normalized="$bundle/Y2JB.Installer_${version}_linux-${asset_arch}.AppImage"
+update_info="gh-releases-zsync|jamesst20|ps5-y2jb-installer|latest|Y2JB.Installer_*_linux-${asset_arch}.AppImage.zsync"
 
-# appimagetool builds from the AppDir, so replace the original AppImage with one
-# that carries the GitHub Releases update information.
-rm -f "$appimage"
+# appimagetool builds from the AppDir, so replace the generated AppImage with one
+# that carries the GitHub Releases update information. Normalize the filename so it
+# matches the update-info pattern and the release asset names.
+rm -f "$appimage" "$normalized" "${normalized}.zsync"
 ARCH="$tool_arch" APPIMAGE_EXTRACT_AND_RUN=1 \
-  "$tool" --no-appstream -u "$update_info" "$appdir" "$appimage"
+  "$tool" --no-appstream -u "$update_info" "$appdir" "$normalized"
 
-readelf -p .upd_info "$appimage" | grep -F "gh-releases-zsync" >/dev/null
+readelf -p .upd_info "$normalized" | grep -F "gh-releases-zsync" >/dev/null
 
 zsyncmake \
-  -u "https://github.com/jamesst20/ps5-y2jb-installer/releases/latest/download/$(basename "$appimage")" \
-  -o "${appimage}.zsync" \
-  "$appimage"
+  -u "https://github.com/jamesst20/ps5-y2jb-installer/releases/latest/download/$(basename "$normalized")" \
+  -o "${normalized}.zsync" \
+  "$normalized"
 
-echo "updated ${appimage}"
-echo "created ${appimage}.zsync"
+echo "updated ${normalized}"
+echo "created ${normalized}.zsync"
