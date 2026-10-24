@@ -19,6 +19,7 @@ fn app_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(transfer::Transfers::default())

@@ -3,7 +3,7 @@ ui/node_modules/
 ui/dist/
 app/node_modules/
 app/src-tauri/target/
-app/src-tauri/gen/
+app/src-tauri/gen/schemas/
 *.partial
 .DS_Store
 

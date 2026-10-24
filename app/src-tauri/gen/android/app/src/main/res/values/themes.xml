@@ -1,0 +1,10 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.y2jb_installer" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/y2jb_background</item>
+        <item name="android:statusBarColor">@color/y2jb_background</item>
+        <item name="android:navigationBarColor">@color/y2jb_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

@@ -13,5 +13,13 @@ fn main() {
     }
     println!("cargo:rerun-if-changed={}", payload.display());
 
+    // Android 15+ supports 16 KiB page sizes. NDK r27 and older need explicit ELF
+    // alignment flags; without them Android 17 warns and may refuse to load the library.
+    let target = std::env::var("TARGET").unwrap_or_default();
+    if target.contains("android") {
+        println!("cargo:rustc-link-arg=-Wl,-z,max-page-size=16384");
+        println!("cargo:rustc-link-arg=-Wl,-z,common-page-size=16384");
+    }
+
     tauri_build::build()
 }

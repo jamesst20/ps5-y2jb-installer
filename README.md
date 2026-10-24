@@ -148,6 +148,7 @@ The host and unit tests run without a console. Network-dependent tests are descr
 | Document | Contents |
 |---|---|
 | [Changelog](CHANGELOG.md) | Release history |
+| [Android (experimental)](docs/ANDROID.md) | Android prototype build and current limitations |
 | [Building](docs/BUILDING.md) | Build steps and platform-specific prerequisites |
 | [Testing](docs/TESTING.md) | Test suite commands |
 | [Releasing](docs/RELEASING.md) | Release steps |

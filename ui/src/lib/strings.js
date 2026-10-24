@@ -2,6 +2,9 @@
 
 // All user-visible text, grouped by the component that owns it. Strings shared by
 // several components live in common so no component imports another component's section.
+const localDevice =
+  typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent) ? 'device' : 'PC';
+
 export const strings = {
   common: {
     cancel: 'Cancel',
@@ -86,14 +89,14 @@ export const strings = {
     fetchJoin: 'Fetch and join',
     install: 'Install',
     reinstall: 'Reinstall',
-    cached: 'Files are cached on this PC.',
+    cached: `Files are cached on this ${localDevice}.`,
     unsupportedFirmware: 'This firmware is not supported.',
   },
 
   y2jb: {
     title: 'Y2JB',
     onPs5: 'On the PS5',
-    onPc: 'Cached on this PC',
+    onPc: `Cached on this ${localDevice}`,
     unknownVersion: 'Version unknown',
     none: 'None',
     release: 'Release',
