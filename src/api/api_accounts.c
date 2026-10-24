@@ -61,7 +61,7 @@ cJSON *accounts_summary(void) {
 
   if (accounts_init() != 0) {
     cJSON_AddBoolToObject(root, "ok", 0);
-    cJSON_AddStringToObject(root, "error", "SceUserService could not start");
+    cJSON_AddStringToObject(root, "error", "SceUserService could not start.");
     return root;
   }
 
@@ -102,25 +102,25 @@ static int body_uid(const char *body, size_t body_len, int32_t *uid) {
 http_reply_t api_activate(const char *body, size_t body_len) {
   int32_t uid = 0;
   if (body_uid(body, body_len, &uid) != 0) {
-    return result_reply(400, 0, "expected a JSON body with a uid");
+    return result_reply(400, 0, "Expected a JSON body with a UID.");
   }
   if (accounts_init() != 0) {
-    return result_reply(500, 0, "SceUserService could not start");
+    return result_reply(500, 0, "SceUserService could not start.");
   }
   int sce_error = 0;
   int rc = accounts_activate(uid, &sce_error);
   switch (rc) {
     case 0:
-      return result_reply(200, 1, "activated. Reboot the console before continuing.");
+      return result_reply(200, 1, "Activated. You can complete the remaining steps before rebooting.");
     case 1:
-      return result_reply(200, 1, "already activated");
+      return result_reply(200, 1, "Already activated.");
     case -1:
-      return result_reply(404, 0, "that user is not logged in");
+      return result_reply(404, 0, "That user is not logged in.");
     case -2:
-      return result_reply(409, 0, "no registry slot has this user's name. Rename the account to match.");
+      return result_reply(409, 0, "No registry slot has this user's name. Rename the account to match.");
     default: {
       char msg[96];
-      snprintf(msg, sizeof msg, "registry write failed (0x%08X)", (unsigned)sce_error);
+      snprintf(msg, sizeof msg, "Registry write failed (0x%08X).", (unsigned)sce_error);
       return result_reply(500, 0, msg);
     }
   }
@@ -129,17 +129,17 @@ http_reply_t api_activate(const char *body, size_t body_len) {
 http_reply_t api_fakesignin(const char *body, size_t body_len) {
   int32_t uid = 0;
   if (body_uid(body, body_len, &uid) != 0) {
-    return result_reply(400, 0, "expected a JSON body with a uid");
+    return result_reply(400, 0, "Expected a JSON body with a UID.");
   }
   if (accounts_init() != 0) {
-    return result_reply(500, 0, "SceUserService could not start");
+    return result_reply(500, 0, "SceUserService could not start.");
   }
   account_info_t info;
   if (accounts_find(uid, &info) != 0) {
-    return result_reply(404, 0, "that user is not logged in");
+    return result_reply(404, 0, "That user is not logged in.");
   }
   if (!info.activated) {
-    return result_reply(409, 0, "activate this account first");
+    return result_reply(409, 0, "Activate this account first.");
   }
   char msg[256];
   int rc = fakesignin_run(msg, sizeof msg);

@@ -4604,7 +4604,7 @@ dependencies = [
 
 [[package]]
 name = "y2jb-installer"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "hex",
  "if-addrs",

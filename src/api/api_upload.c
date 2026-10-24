@@ -62,8 +62,8 @@ const http_body_sink_t *api_upload_sink(void) {
 
 http_reply_t api_upload_cancel(void) {
   if (!upload_running()) {
-    return result_reply(409, 0, "no upload is running");
+    return result_reply(409, 0, "No upload is running.");
   }
   upload_abort("cancelled by the app");
-  return result_reply(200, 1, "upload cancelled");
+  return result_reply(200, 1, "Upload cancelled.");
 }

@@ -68,7 +68,7 @@ export class Installer {
   selectedTag = $state('');
   transfer = $state(null);
   busy = $state('');
-  rebootNeeded = $state(false);
+  rebootPending = $state(false);
   confirmBlock = $state(false);
   initialized = $state(false);
   paused = $state(false);
@@ -278,19 +278,17 @@ export class Installer {
     this.loadReleases();
     this.cacheLoading = true;
     try {
-      // Await the cheap version command before the cache hash so the mismatch banner never
-      // compares the payload against an empty string.
-      const version = await appVersion();
+      // The version and payload are instant. Do not hold the payload behind the cache scan;
+      // hashing cached PKGs can take a while, and the user needs the Send payload card as
+      // soon as the loader is found.
+      const [version, nextPayload] = await Promise.all([appVersion(), payloadInfo()]);
       if (this.stopped) return;
       this.appVersion = version;
-      const [nextManifest, nextPayload, nextCache] = await Promise.all([
-        manifestView(),
-        payloadInfo(),
-        cacheStatus(),
-      ]);
+      this.payload = nextPayload;
+
+      const [nextManifest, nextCache] = await Promise.all([manifestView(), cacheStatus()]);
       if (this.stopped) return;
       this.manifest = nextManifest;
-      this.payload = nextPayload;
       this.cache = nextCache;
     } catch (error) {
       if (!this.stopped) {
@@ -471,6 +469,7 @@ export class Installer {
       // payload stopped, cable pulled). Stop polling until the user connects again.
       if (this.failures >= 2) {
         this.paused = true;
+        this.rebootPending = false;
       }
     } finally {
       this.refreshing = false;
@@ -481,6 +480,9 @@ export class Installer {
     const next = address.trim();
     if (!next) {
       return;
+    }
+    if (next !== this.connectedIp) {
+      this.rebootPending = false;
     }
     this.ip = next;
     this.targetIp = next;
@@ -571,8 +573,8 @@ export class Installer {
         result.message ?? (result.ok ? '' : t.common.errorStatus(result.status)),
         result.ok === true,
       );
-      if (result.ok && result.message && result.message.includes('Reboot')) {
-        this.rebootNeeded = true;
+      if (result.ok && step === 'accounts') {
+        this.rebootPending = true;
       }
     } catch {
       this.notify(step, t.connection.consoleUnreachable, false);
@@ -590,7 +592,25 @@ export class Installer {
     return this.runAction('accounts', () => activate(this.selectedAccount.uid));
   };
 
-  rebootConsole = () => this.runAction('accounts', reboot);
+  rebootConsole = async () => {
+    this.busy = 'reboot';
+    this.clearNotice('connect');
+    try {
+      const result = await reboot();
+      this.notify(
+        'connect',
+        result.message ?? (result.ok ? '' : t.common.errorStatus(result.status)),
+        result.ok === true,
+      );
+      if (result.ok) {
+        this.rebootPending = false;
+      }
+    } catch {
+      this.notify('connect', t.connection.consoleUnreachable, false);
+    } finally {
+      this.busy = '';
+    }
+  };
 
   removeDownload0File = () => this.runAction('y2jb', removeDownload0);
 
@@ -730,8 +750,8 @@ export class Installer {
         result.message ?? (result.ok ? '' : t.common.errorStatus(result.status)),
         result.ok === true,
       );
-      if (result.ok && result.message && result.message.includes('Reboot')) {
-        this.rebootNeeded = true;
+      if (result.ok) {
+        this.rebootPending = true;
       }
     } catch (error) {
       this.notify('accounts', String(error), false);
@@ -787,7 +807,7 @@ export class Installer {
     this.connectedIp = '';
     this.failures = 0;
     this.initialized = false;
-    this.rebootNeeded = false;
+    this.rebootPending = false;
     this.confirmBlock = false;
     this.transfer = null;
     this.accountSlot = '';

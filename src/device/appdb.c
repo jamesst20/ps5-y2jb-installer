@@ -128,7 +128,7 @@ static int values_match(const char *path) {
 static int edit_live(char *msg, size_t cap) {
   sqlite3 *db = NULL;
   if (sqlite3_open_v2(LIVE_PATH, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX, NULL) != SQLITE_OK) {
-    snprintf(msg, cap, "could not open appinfo.db for writing: %s", sqlite3_errmsg(db));
+    snprintf(msg, cap, "Could not open appinfo.db for writing: %s", sqlite3_errmsg(db));
     sqlite3_close(db);
     return -1;
   }
@@ -145,7 +145,7 @@ static int edit_live(char *msg, size_t cap) {
     }
   }
   if (rc != 0) {
-    snprintf(msg, cap, "the YouTube rows did not change as expected; the file is unchanged");
+    snprintf(msg, cap, "The YouTube rows did not change as expected; the file is unchanged.");
   }
   sqlite3_close(db);
   return rc;
@@ -165,14 +165,14 @@ appdb_updates_t appdb_youtube_updates(void) {
 int appdb_block_youtube_updates(char *msg, size_t cap) {
   char backup[256];
   if (make_backup(backup, sizeof backup) != 0) {
-    snprintf(msg, cap, "could not back up appinfo.db to the store; nothing was changed");
+    snprintf(msg, cap, "Could not back up appinfo.db to the store; nothing was changed.");
     return -1;
   }
   if (edit_live(msg, cap) != 0) {
     return -1;
   }
   if (values_match(LIVE_PATH) != 1) {
-    snprintf(msg, cap, "the YouTube rows did not read back as blocked; the backup is in the store");
+    snprintf(msg, cap, "The YouTube rows did not read back as blocked; the backup is in the store.");
     return -1;
   }
   snprintf(msg, cap, "YouTube updates are blocked. Backup kept: %s", backup);

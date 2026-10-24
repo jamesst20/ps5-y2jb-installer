@@ -1,7 +1,7 @@
 {
   "name": "y2jb-installer-ui",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "license": "GPL-3.0-or-later",
   "scripts": {

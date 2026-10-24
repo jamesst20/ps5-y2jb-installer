@@ -71,18 +71,18 @@ int fakesignin_run(char *msg, size_t msg_cap) {
   const char *path = upload_fakesignin_path();
   struct stat st;
   if (stat(path, &st) != 0 || st.st_size <= 0) {
-    set_msg(msg, msg_cap, "upload np-fake-signin-ps5.elf first");
+    set_msg(msg, msg_cap, "Upload np-fake-signin-ps5.elf first.");
     return -1;
   }
 
   if (send_to_loader(path) != 0) {
     char text[160];
-    snprintf(text, sizeof text, "could not send to the ELF loader on port %d (errno %d)", Y2JB_LOADER_PORT, errno);
+    snprintf(text, sizeof text, "Could not send to the ELF loader on port %d (errno %d).", Y2JB_LOADER_PORT, errno);
     set_msg(msg, msg_cap, text);
     return -1;
   }
 
   remove(path);
-  set_msg(msg, msg_cap, "np-fake-signin sent to the loader. Reboot the console to finish.");
+  set_msg(msg, msg_cap, "Fake sign-in sent to the loader. You can complete the remaining steps before rebooting.");
   return 0;
 }

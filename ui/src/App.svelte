@@ -13,6 +13,7 @@
   import YoutubeStep from '$lib/components/YoutubeStep.svelte';
   import Y2jbStep from '$lib/components/Y2jbStep.svelte';
   import UpdatesStep from '$lib/components/UpdatesStep.svelte';
+  import RebootBar from '$lib/components/RebootBar.svelte';
 
   const installer = new Installer();
 
@@ -22,7 +23,7 @@
   });
 </script>
 
-<div class="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-8">
+<div class="mx-auto flex max-w-6xl flex-col gap-6 px-5 pt-8 {installer.rebootPending ? 'pb-28' : 'pb-8'}">
   <header class="flex items-center gap-3 px-1">
     <div class="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
       <PlayIcon class="size-4" />
@@ -62,3 +63,5 @@
     <UpdatesStep {installer} />
   </main>
 </div>
+
+<RebootBar {installer} />

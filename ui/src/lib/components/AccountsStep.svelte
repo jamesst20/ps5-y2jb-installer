@@ -3,7 +3,6 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
-  import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
   import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
   } from '$lib/components/ui/select/index.js';
@@ -82,17 +81,6 @@
           <p class="text-xs text-muted-foreground">{t.accounts.logInFirst}</p>
         {/if}
       {/if}
-    {/if}
-
-    {#if installer.rebootNeeded}
-      <Alert class="border-warning/40 bg-warning/10">
-        <AlertDescription class="flex items-center justify-between gap-3">
-          <span>{t.accounts.rebootNeeded}</span>
-          <Button size="sm" variant="outline" onclick={installer.rebootConsole}>
-            {t.accounts.reboot}
-          </Button>
-        </AlertDescription>
-      </Alert>
     {/if}
 
     <Notice notice={installer.notices.accounts} />

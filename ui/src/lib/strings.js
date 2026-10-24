@@ -10,8 +10,8 @@ export const strings = {
     notInstalled: 'Not installed',
     notCached: 'Files are not fetched yet.',
     errorStatus: (status) => `Error ${status}`,
-    noConsoleSelected: 'no console selected',
-    needsDesktopApp: 'this action needs the desktop app',
+    noConsoleSelected: 'No console selected.',
+    needsDesktopApp: 'This action needs the desktop app.',
   },
 
   app: {
@@ -19,6 +19,9 @@ export const strings = {
     subtitle: 'Console setup',
     setupComplete: 'Setup complete',
     setupCompleteHint: 'Open YouTube on the console to start Y2JB.',
+    rebootRequired: 'A reboot is required',
+    rebootRequiredHint: 'Account activation and sign-in take effect after restarting. You can finish the remaining steps first.',
+    rebootNow: 'Reboot now',
   },
 
   connection: {
@@ -73,8 +76,6 @@ export const strings = {
     activate: 'Activate',
     fakeSignin: 'Fake sign-in',
     logInFirst: 'Log in as this user on the console first.',
-    rebootNeeded: 'Reboot the console to finish.',
-    reboot: 'Reboot now',
   },
 
   youtube: {
@@ -121,7 +122,7 @@ export const strings = {
 
   updates: {
     title: 'Block updates',
-    hint: 'Stops YouTube from updating itself.',
+    hint: 'Stops YouTube from updating itself. This is the final step and restarts the console.',
     blocked: 'Blocked',
     notBlocked: 'Not blocked',
     block: 'Block updates',

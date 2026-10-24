@@ -6,7 +6,10 @@
 </script>
 
 {#if notice}
-  <Alert variant={notice.ok ? 'default' : 'destructive'}>
-    <AlertDescription>{notice.text}</AlertDescription>
+  <Alert
+    variant={notice.ok ? 'default' : 'destructive'}
+    class={notice.ok ? 'border-success/40 bg-success/5 text-success' : ''}
+  >
+    <AlertDescription class={notice.ok ? 'text-success' : ''}>{notice.text}</AlertDescription>
   </Alert>
 {/if}

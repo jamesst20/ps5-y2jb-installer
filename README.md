@@ -69,10 +69,10 @@ Make the AppImage executable and run it, or install the `.deb` package. The AppI
 
 1. Start the exploit and the ELF loader on the console.
 2. Open the application, scan the LAN, and select the console. If only the loader answers, click **Send payload** to start the embedded payload.
-3. **Accounts** — activate a local user. A reboot may be required. Then run the fake sign-in; the application uploads `np-fake-signin-ps5.elf`, sends it to the loader, and removes the console-side copy.
+3. **Accounts** — activate a local user, then run the fake sign-in; the application uploads `np-fake-signin-ps5.elf`, sends it to the loader, and removes the console-side copy.
 4. **YouTube** — select the region. The application detects the firmware, selects the matching build, fetches and verifies both PKGs, joins them, uploads the result, and starts the installation. The merged PKG is deleted when the job finishes.
 5. **Y2JB** — select a `download0.dat` release, fetch it, and upload it. The panel reports the release installed on the console, the release cached on the PC, and whether an update is available.
-6. **Block updates** — confirm the dialog. The payload edits `/system_data/priv/mms/appinfo.db` in place, keeps a timestamped backup, and reboots the console. This should be the final setup action.
+6. **Block updates** — confirm the dialog. The payload edits `/system_data/priv/mms/appinfo.db` in place, keeps a timestamped backup, and reboots the console. This is the final setup action; the same reboot also applies account activation and fake sign-in.
 7. Disconnect the console from the internet, then launch YouTube to trigger Y2JB. Opening YouTube online can show the sign-in screen and overwrite `download0.dat`.
 
 The payload does not survive a reboot. To perform another action after restarting, start the exploit and the ELF loader again and resend the payload from the application.
@@ -147,6 +147,7 @@ The host and unit tests run without a console. Network-dependent tests are descr
 
 | Document | Contents |
 |---|---|
+| [Changelog](CHANGELOG.md) | Release history |
 | [Building](docs/BUILDING.md) | Build steps and platform-specific prerequisites |
 | [Testing](docs/TESTING.md) | Test suite commands |
 | [Releasing](docs/RELEASING.md) | Release steps |
