@@ -183,7 +183,7 @@ mod tests {
             build_for_firmware("11.39").map(|b| b.build.as_str()),
             Some("v01.000.003")
         );
-        assert!(build_for_firmware("11.40").is_none());
+        assert_eq!(build_for_firmware("11.40").map(|b| b.build.as_str()), Some("v01.000.003"));
         assert_eq!(
             build_for_firmware("11.41").map(|b| b.build.as_str()),
             Some("v01.000.003")

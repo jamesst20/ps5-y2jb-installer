@@ -18,7 +18,7 @@ The console does not need outbound internet access. The application fetches Sony
 ## Features
 
 - Offline local account activation and fake PSN sign-in.
-- Firmware-aware YouTube build selection for firmware **4.03 – 13.60**. The [Y2JB autoloader](https://github.com/itsPLK/ps5-y2jb-autoloader) does not support **11.40**.
+- Firmware-aware YouTube build selection for firmware **4.03 – 13.60**.
 - Verified Sony PKG downloads, package joining, and installation.
 - `download0.dat` release selection with local/console version reporting and update detection.
 - In-place YouTube update blocking with timestamped `appinfo.db` backups.
@@ -32,7 +32,7 @@ Each setup step is independent and can be repeated safely.
 
 ### Console
 
-- PS5 on firmware **4.03 – 13.60**. The Y2JB autoloader does not support firmware **11.40**.
+- PS5 on firmware **4.03 – 13.60**.
 - Kernel read/write access from a compatible exploit.
 - An ELF loader listening on TCP port **9021** (elfdr or equivalent).
 

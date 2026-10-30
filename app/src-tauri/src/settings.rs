@@ -9,8 +9,9 @@ use tauri::{AppHandle, Manager};
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
-    /// The last console the user connected to, or "".
     pub console_ip: String,
+    pub custom_download0_repos: Vec<String>,
+    pub active_download0_repo: Option<String>,
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -54,6 +55,27 @@ pub fn set_console(app: AppHandle, ip: String) -> Result<Settings, String> {
     };
     let mut settings = load(&app);
     settings.console_ip = console_ip;
+    save(&app, &settings)?;
+    Ok(settings)
+}
+
+#[tauri::command]
+pub fn set_download0_repo(
+    app: AppHandle,
+    repo: Option<String>,
+    all_repos: Option<Vec<String>>,
+) -> Result<Settings, String> {
+    let mut settings = load(&app);
+    if let Some(r) = repo {
+        settings.active_download0_repo = if r.trim().is_empty() {
+            None
+        } else {
+            Some(r.trim().to_string())
+        };
+    }
+    if let Some(repos) = all_repos {
+        settings.custom_download0_repos = repos;
+    }
     save(&app, &settings)?;
     Ok(settings)
 }

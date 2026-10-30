@@ -35,6 +35,7 @@ import {
   cancelTransfer,
   onTransferProgress,
   download0Releases,
+  setDownload0Repo,
   appVersion,
 } from './desktop.js';
 import { strings as t } from './strings.js';
@@ -244,6 +245,8 @@ export class Installer {
 
     try {
       const settings = await getSettings();
+      if (settings?.custom_download0_repos) this.customRepos = settings.custom_download0_repos;
+      if (settings?.active_download0_repo) this.activeRepo = settings.active_download0_repo;
       if (settings?.console_ip && !this.ip) {
         this.ip = settings.console_ip;
       }
@@ -325,7 +328,7 @@ export class Installer {
     this.releasesLoading = true;
     this.releasesError = false;
     try {
-      this.releases = await download0Releases();
+      this.releases = await download0Releases(this.activeRepo);
       if (
         !this.selectedTag ||
         !this.releases.some((release) => release.tag === this.selectedTag)
@@ -686,7 +689,7 @@ export class Installer {
     this.transfer = null;
     this.clearNotice('y2jb');
     try {
-      const result = await fetchDownload0(this.selectedTag);
+      const result = await fetchDownload0(this.activeRepo, this.selectedTag);
       // The fetch already verified this digest, so publish it immediately instead of
       // hashing the same 336 MB again through cacheStatus.
       this.cache = {
@@ -795,6 +798,21 @@ export class Installer {
     } catch {
       // Nothing to stop.
     }
+  };
+
+  addCustomRepo = async (repoSlug) => {
+    const slug = repoSlug.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "");
+    if (!slug || this.customRepos.includes(slug)) return;
+    this.customRepos = [...this.customRepos, slug];
+    this.activeRepo = slug;
+    await setDownload0Repo(this.activeRepo, this.customRepos).catch(() => {});
+    await this.loadReleases();
+  };
+
+  switchRepo = async (repoSlug) => {
+    this.activeRepo = repoSlug;
+    await setDownload0Repo(this.activeRepo, this.customRepos).catch(() => {});
+    await this.loadReleases();
   };
 
   disconnect = () => {
