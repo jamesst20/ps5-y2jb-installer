@@ -102,5 +102,5 @@
     { "from": "12.60", "to": "13.39", "build": "v01.000.030" },
     { "from": "13.40", "to": "13.60", "build": "v01.009.253" }
   ],
-  "unsupported_firmware": ["11.40"]
+  "unsupported_firmware": []
 }

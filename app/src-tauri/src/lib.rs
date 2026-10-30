@@ -27,6 +27,7 @@ pub fn run() {
             app_version,
             settings::get_settings,
             settings::set_console,
+            settings::set_download0_repo,
             discover::discover,
             discover::probe,
             payload::payload_info,

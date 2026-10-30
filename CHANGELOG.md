@@ -4,6 +4,12 @@
 
 ### Added
 
+- Debian package (`.deb`) for Debian/Ubuntu distributions.
+- Option to select custom repositories for `download0.dat`.
+- Support for firmware 11.40.
+
+### Added
+
 - Signed universal Android APK in release artifacts.
 - Android build documentation and signing instructions.
 

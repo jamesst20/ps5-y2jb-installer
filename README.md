@@ -18,7 +18,7 @@ The console does not need outbound internet access. The application fetches Sony
 ## Features
 
 - Offline local account activation and fake PSN sign-in.
-- Firmware-aware YouTube build selection for firmware **4.03 – 13.60**. The [Y2JB autoloader](https://github.com/itsPLK/ps5-y2jb-autoloader) does not support **11.40**.
+- Firmware-aware YouTube build selection for firmware **4.03 – 13.60**.
 - Verified Sony PKG downloads, package joining, and installation.
 - `download0.dat` release selection with local/console version reporting and update detection.
 - In-place YouTube update blocking with timestamped `appinfo.db` backups.
@@ -32,7 +32,7 @@ Each setup step is independent and can be repeated safely.
 
 ### Console
 
-- PS5 on firmware **4.03 – 13.60**. The Y2JB autoloader does not support firmware **11.40**.
+- PS5 on firmware **4.03 – 13.60**.
 - Kernel read/write access from a compatible exploit.
 - An ELF loader listening on TCP port **9021** (elfdr or equivalent).
 
@@ -66,6 +66,7 @@ Download the appropriate artifact from the project's Releases page.
 |---|---|
 | macOS (Intel and Apple Silicon) | `Y2JB.Installer_<version>_macos-universal.dmg` |
 | Windows x64 | `y2jb-installer_<version>_windows-x64.zip` |
+| Linux amd64 (Debian/Ubuntu) | `y2jb-installer_<version>_amd64.deb` |
 | Linux amd64 | `Y2JB.Installer_<version>_linux-amd64.AppImage` |
 | Linux arm64 | `Y2JB.Installer_<version>_linux-aarch64.AppImage` |
 | Android | `y2jb-installer_<version>_android-universal.apk` |
@@ -79,6 +80,13 @@ Open the DMG and drag the application to **Applications**. The build is ad-hoc s
 Extract the ZIP and run `y2jb-installer.exe`. No installer or administrator rights are required. If SmartScreen appears, choose **More info → Run anyway**.
 
 ### Linux
+To install the Debian/Ubuntu package:
+
+```sh
+sudo dpkg -i y2jb-installer_<version>_amd64.deb
+sudo apt-get install -f # to resolve missing dependencies if any
+```
+
 
 Make the AppImage executable and run it. The AppImage requires FUSE; use `--appimage-extract-and-run` if FUSE is unavailable. The AppImage includes GitHub Releases update information and can be updated with AppImageUpdate; the matching `.zsync` file is published next to it.
 
