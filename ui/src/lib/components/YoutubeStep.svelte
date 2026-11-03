@@ -3,7 +3,9 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
+  import { Progress } from '$lib/components/ui/progress/index.js';
   import { strings as t } from '$lib/strings.js';
+  import { formatBytes } from '$lib/format.js';
   import Step from '$lib/components/Step.svelte';
   import Notice from '$lib/components/Notice.svelte';
   import RegionTabs from '$lib/components/RegionTabs.svelte';
@@ -108,15 +110,31 @@
         </div>
 
         {#if row.installJob}
-          <p
-            class="text-sm {row.installJob.state === 'error'
-              ? 'text-destructive'
-              : row.installJob.state === 'done'
-                ? 'text-success'
-                : 'text-muted-foreground'}"
-          >
-            {row.installJob.message}
-          </p>
+          <div class="flex flex-col gap-1.5 rounded-md border p-2.5">
+            {#if row.installJob.state === 'running'}
+              <div class="flex items-center justify-between gap-2 text-xs">
+                <span class="font-medium">{installer.installPhase(row.installJob)}</span>
+                {#if row.installJob.progress >= 0}
+                  <span class="tabular-nums text-muted-foreground">{row.installJob.progress}%</span>
+                {/if}
+              </div>
+              {#if row.installJob.progress >= 0}
+                <Progress value={row.installJob.progress} class="h-1.5" />
+              {/if}
+              {#if row.installJob.total_bytes > 0}
+                <span class="text-[11px] tabular-nums text-muted-foreground">
+                  {formatBytes(row.installJob.downloaded_bytes)} / {formatBytes(row.installJob.total_bytes)}
+                </span>
+              {/if}
+              {#if !(row.installJob.progress >= 0)}
+                <p class="text-xs text-muted-foreground">{row.installJob.message}</p>
+              {/if}
+            {:else if row.installJob.state === 'error'}
+              <p class="text-sm text-destructive">{row.installJob.message}</p>
+            {:else if row.installJob.state === 'done'}
+              <p class="text-sm text-success">{row.installJob.message}</p>
+            {/if}
+          </div>
         {/if}
       </div>
     {/if}

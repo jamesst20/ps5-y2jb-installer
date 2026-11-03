@@ -7,6 +7,7 @@
 - Debian packages (`.deb`) for Debian/Ubuntu on amd64 and arm64.
 - Option to select custom repositories for `download0.dat`.
 - YouTube setup is now per region (USA `PPSA01650`, Europe `PPSA01651`, Japan `PPSA01652`), with independent install state, `download0.dat` release selection, upload, and removal for each region.
+- YouTube installation now reports the console install phase, byte progress, and Sony failure descriptions instead of assuming the install succeeds.
 
 ### Fixed
 

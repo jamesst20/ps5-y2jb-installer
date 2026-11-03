@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +28,7 @@ typedef struct {
 
 static struct MHD_Daemon *g_daemon = NULL;
 static char g_file[512];
+static atomic_uint_fast64_t g_served;
 
 static enum MHD_Result accept_loopback(void *cls, const struct sockaddr *addr, socklen_t len) {
   (void)cls;
@@ -50,6 +52,7 @@ static ssize_t read_body(void *cls, uint64_t pos, char *buf, size_t max) {
   }
   body->offset += (uint64_t)got;
   body->remaining -= (uint64_t)got;
+  atomic_fetch_add_explicit(&g_served, (uint64_t)got, memory_order_relaxed);
   return got;
 }
 
@@ -166,9 +169,14 @@ int loopback_serve(const char *path) {
     return -1;
   }
   snprintf(g_file, sizeof g_file, "%s", path);
+  atomic_store_explicit(&g_served, 0, memory_order_relaxed);
   g_daemon = MHD_start_daemon(MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG, Y2JB_LOOPBACK_PORT, &accept_loopback,
                               NULL, &handle, NULL, MHD_OPTION_END);
   return g_daemon ? 0 : -1;
+}
+
+uint64_t loopback_served(void) {
+  return (uint64_t)atomic_load_explicit(&g_served, memory_order_relaxed);
 }
 
 void loopback_stop(void) {

@@ -74,6 +74,7 @@ export class Installer {
   transfer = $state(null);
   busy = $state('');
   busyRegion = $state('');
+  pendingAdvance = $state('');
   rebootPending = $state(false);
   confirmBlock = $state(false);
   initialized = $state(false);
@@ -454,6 +455,31 @@ export class Installer {
     }
   };
 
+  // Keep the YouTube step open while the console installs, then advance once the payload
+  // reports a successful job. A failed job stays open so its error is visible.
+  maybeAdvanceInstall = () => {
+    if (!this.pendingAdvance) {
+      return;
+    }
+    const job = this.status?.jobs?.install;
+    if (!job || job.title_id !== this.pendingAdvance) {
+      return;
+    }
+    if (job.state === 'running') {
+      return;
+    }
+    if (job.state === 'done') {
+      // Wait for the status snapshot to show the installed title before collapsing.
+      if (!this.stepDone.youtube) {
+        return;
+      }
+      this.pendingAdvance = '';
+      this.advance('youtube');
+      return;
+    }
+    this.pendingAdvance = '';
+  };
+
   // Keep the account dropdown on a real account, preferring the one logged in now.
   ensureAccount = () => {
     if (this.accounts.length === 0) {
@@ -468,6 +494,23 @@ export class Installer {
 
   stepState = (step) => {
     return this.stepDone[step] ? 'done' : this.openStep === step ? 'active' : 'todo';
+  };
+
+  installPhase = (job) => {
+    switch (job?.console_status) {
+      case 'transferring':
+        return t.youtube.installTransferring;
+      case 'promoting':
+        return t.youtube.installPromoting;
+      case 'playable':
+      case 'completed':
+        return t.youtube.installFinishing;
+      case 'error':
+        return t.youtube.installFailed;
+      case 'none':
+      default:
+        return t.youtube.installing;
+    }
   };
 
   discoveryLabel = (device) => {
@@ -511,6 +554,7 @@ export class Installer {
       this.connectedIp = this.targetIp;
       this.failures = 0;
       this.ensureAccount();
+      this.maybeAdvanceInstall();
       if (this.desktop) {
         await this.initialize();
       }
@@ -550,6 +594,7 @@ export class Installer {
     this.paused = false;
     this.failures = 0;
     this.initialized = false;
+    this.pendingAdvance = '';
     this.probed = null;
     this.clearNotice('connect');
     try {
@@ -736,6 +781,8 @@ export class Installer {
           result.message ?? t.common.errorStatus(result.status),
           false,
         );
+      } else {
+        this.pendingAdvance = entry.title_id;
       }
     } catch (error) {
       this.notify('youtube', String(error), false);
@@ -744,7 +791,6 @@ export class Installer {
       this.busyRegion = '';
       this.transfer = null;
       await this.refresh();
-      this.advance('youtube');
     }
   };
 
@@ -902,6 +948,7 @@ export class Installer {
     this.confirmBlock = false;
     this.transfer = null;
     this.busyRegion = '';
+    this.pendingAdvance = '';
     this.accountSlot = '';
     this.notices = {};
     this.openStep = '';

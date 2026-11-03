@@ -37,7 +37,30 @@ typedef struct {
   unsigned char unknown[6480];
 } sce_playgo_info_t;
 
+typedef struct {
+  int32_t error_code;
+  int32_t version;
+  char description[512];
+  char type[9];
+} sce_appinst_error_t;
+
+typedef struct {
+  char status[16];
+  char src_type[8];
+  uint32_t remain_time;
+  uint64_t downloaded_size;
+  uint64_t initial_chunk_size;
+  uint64_t total_size;
+  uint32_t promote_progress;
+  sce_appinst_error_t error_info;
+  int32_t local_copy_percent;
+  uint8_t is_copy_only;
+  /* Newer firmware may append fields; keep enough room for them. */
+  uint8_t reserved[2048];
+} sce_appinst_status_t;
+
 int sceAppInstUtilInitialize(void);
 int sceAppInstUtilInstallByPackage(sce_meta_info_t *meta, sce_pkg_info_t *pkg_info, sce_playgo_info_t *playgo);
+int sceAppInstUtilGetInstallStatus(const char *content_id, sce_appinst_status_t *status);
 
 #endif

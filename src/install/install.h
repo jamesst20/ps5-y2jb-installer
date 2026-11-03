@@ -15,6 +15,12 @@ typedef struct {
   install_state_t state;
   char title_id[TITLE_ID_CAP];
   char message[256];
+  char console_status[24];
+  unsigned long long downloaded_bytes;
+  unsigned long long total_bytes;
+  int progress; /* 0-100, or -1 when the console does not report progress */
+  int error_code;
+  char error_description[512];
 } install_status_t;
 
 /* Serves pkg_path on the loopback port and asks the console to install it into title_id's

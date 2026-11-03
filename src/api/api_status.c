@@ -130,6 +130,12 @@ static cJSON *jobs_json(void) {
   cJSON_AddStringToObject(i, "state", install_state_name(in.state));
   cJSON_AddStringToObject(i, "title_id", in.title_id);
   cJSON_AddStringToObject(i, "message", in.message);
+  cJSON_AddStringToObject(i, "console_status", in.console_status);
+  cJSON_AddNumberToObject(i, "downloaded_bytes", (double)in.downloaded_bytes);
+  cJSON_AddNumberToObject(i, "total_bytes", (double)in.total_bytes);
+  cJSON_AddNumberToObject(i, "progress", in.progress);
+  cJSON_AddNumberToObject(i, "error_code", in.error_code);
+  cJSON_AddStringToObject(i, "error_description", in.error_description);
   return o;
 }
 
