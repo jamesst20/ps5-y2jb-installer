@@ -98,7 +98,12 @@ fn put(
         .split_once("\r\n\r\n")
         .map(|(_, body)| body.trim())
         .unwrap_or("");
-    Err(if body.is_empty() {
+    Err(if status.is_empty() {
+        format!(
+            "{label}: the console closed the connection without replying; \
+             the payload may have stopped or restarted"
+        )
+    } else if body.is_empty() {
         format!("{label}: {status}")
     } else {
         body.to_string()

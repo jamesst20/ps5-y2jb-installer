@@ -17,6 +17,7 @@ typedef struct {
   int streaming;
   int finished;
   int failed;
+  int rejected; /* begin failed; drain the body, then reply once */
   char message[192];
 } request_ctx_t;
 
@@ -147,7 +148,11 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn, const 
       MHD_get_connection_values(conn, MHD_GET_ARGUMENT_KIND, &collect_query, &query);
       char why[192] = "";
       if (g_sink->begin(method, url, query_text, content_length(conn), why, sizeof why) != 0) {
-        return send_reply(conn, error_reply(400, why));
+        /* Queue the rejection only after the body has been drained. Replying while the
+         * request body is still arriving makes libmicrohttpd drop the response. */
+        ctx->rejected = 1;
+        snprintf(ctx->message, sizeof ctx->message, "%s", why);
+        return MHD_YES;
       }
       ctx->streaming = 1;
     }
@@ -155,6 +160,10 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn, const 
   }
 
   if (*upload_size > 0) {
+    if (ctx->rejected) {
+      *upload_size = 0;
+      return MHD_YES;
+    }
     if (ctx->streaming) {
       if (!ctx->failed) {
         char why[192] = "";
@@ -175,6 +184,10 @@ static enum MHD_Result on_request(void *cls, struct MHD_Connection *conn, const 
   }
 
   http_reply_t reply;
+  if (ctx->rejected) {
+    ctx->finished = 1;
+    return send_reply(conn, error_reply(400, ctx->message));
+  }
   if (ctx->streaming) {
     ctx->finished = 1;
     if (ctx->failed) {

@@ -7,6 +7,10 @@
 - Debian packages (`.deb`) for Debian/Ubuntu on amd64 and arm64.
 - Option to select custom repositories for `download0.dat`.
 
+### Fixed
+
+- Fake sign-in upload failures now report the payload's actual reason instead of a blank `fakesignin:` message.
+
 ## 1.2.0 — 2026-11-03
 
 ### Added
