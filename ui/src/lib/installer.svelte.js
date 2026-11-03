@@ -42,6 +42,8 @@ import { strings as t } from './strings.js';
 import { POLL_MS, STEP_ORDER } from './constants.js';
 import { releaseLabel as formatReleaseLabel } from './format.js';
 
+export const OFFICIAL_DOWNLOAD0_REPO = 'itsPLK/ps5-y2jb-autoloader';
+
 export class Installer {
   appVersion = $state('');
   ip = $state('');
@@ -66,9 +68,10 @@ export class Installer {
   releases = $state([]);
   releasesLoading = $state(false);
   releasesError = $state(false);
+  releasesLoaded = $state(false);
   selectedTag = $state('');
   customRepos = $state([]);
-  activeRepo = $state('itsPLK/ps5-y2jb-autoloader');
+  activeRepo = $state(OFFICIAL_DOWNLOAD0_REPO);
   transfer = $state(null);
   busy = $state('');
   rebootPending = $state(false);
@@ -345,6 +348,7 @@ export class Installer {
       this.releasesError = true;
     } finally {
       this.releasesLoading = false;
+      this.releasesLoaded = true;
     }
   };
 
@@ -802,17 +806,17 @@ export class Installer {
     }
   };
 
-  addCustomRepo = async (repoSlug) => {
-    const slug = repoSlug.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "");
-    if (!slug || this.customRepos.includes(slug)) return;
-    this.customRepos = [...this.customRepos, slug];
+  setRepo = async (repoSlug) => {
+    const slug = repoSlug
+      .trim()
+      .replace(/^https?:\/\/github\.com\//, "")
+      .replace(/\/+$/, "");
+    if (!slug || !/^[\w.-]+\/[\w.-]+$/.test(slug)) return;
+    if (slug !== OFFICIAL_DOWNLOAD0_REPO && !this.customRepos.includes(slug)) {
+      this.customRepos = [...this.customRepos, slug];
+    }
     this.activeRepo = slug;
-    await setDownload0Repo(this.activeRepo, this.customRepos).catch(() => {});
-    await this.loadReleases();
-  };
-
-  switchRepo = async (repoSlug) => {
-    this.activeRepo = repoSlug;
+    this.selectedTag = '';
     await setDownload0Repo(this.activeRepo, this.customRepos).catch(() => {});
     await this.loadReleases();
   };
