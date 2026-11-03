@@ -18,7 +18,7 @@
     installer.youtubeRows.map((row) => ({
       value: row.region,
       label: t.youtube.regions[row.region] ?? row.region,
-      done: row.status?.installed === true,
+      status: row.status?.installed === true ? 'done' : 'missing',
     })),
   );
   const row = $derived(
@@ -95,8 +95,20 @@
         </div>
 
         <div class="flex flex-col gap-0.5">
-          <p class="text-xs {row.cached?.merged ? 'text-success' : 'text-destructive'}">
-            {row.cached?.merged ? t.youtube.cached : t.common.notCached}
+          <p
+            class="text-xs {installer.cacheLoading
+              ? 'text-muted-foreground'
+              : row.cached?.merged
+                ? 'text-success'
+                : 'text-destructive'}"
+          >
+            {#if installer.cacheLoading}
+              {t.common.computing}
+            {:else if row.cached?.merged}
+              {t.youtube.cached}
+            {:else}
+              {t.common.notCached}
+            {/if}
           </p>
           {#if row.cached?.path}
             <p

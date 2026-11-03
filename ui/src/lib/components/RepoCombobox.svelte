@@ -18,7 +18,10 @@
 
   const repoPattern = /^[\w.-]+\/[\w.-]+$/;
   const query = $derived(text.trim());
-  const shown = $derived(open ? text : value);
+  const selectedLabel = $derived(
+    items.find((item) => item.value === value)?.label ?? value,
+  );
+  const shown = $derived(open ? text : selectedLabel);
 
   const filtered = $derived.by(() => {
     const base =

@@ -30,7 +30,7 @@
     installer.download0Rows.map((row) => ({
       value: row.region,
       label: t.youtube.regions[row.region] ?? row.region,
-      done: row.valid === true,
+      status: !row.youtubeInstalled ? 'no-app' : row.valid === true ? 'done' : 'missing',
     })),
   );
   const row = $derived(

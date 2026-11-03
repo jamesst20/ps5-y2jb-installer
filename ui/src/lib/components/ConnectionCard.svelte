@@ -104,7 +104,7 @@
       <Alert class="border-warning/40 bg-warning/10">
         <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
           <span>{t.connection.payloadMismatch(installer.status.version, installer.appVersion)}</span>
-          <Button size="sm" variant="outline" disabled={installer.sending} onclick={installer.send}>
+          <Button size="sm" variant="outline" disabled={!installer.canSendPayload} onclick={installer.send}>
             {t.connection.sendPayload}
           </Button>
         </AlertDescription>
@@ -114,7 +114,7 @@
     {#if installer.payload && (!installer.reachable || installer.versionMismatch)}
       <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
         <span class="text-xs text-muted-foreground">{t.connection.payload} · {formatBytes(installer.payload.size)}</span>
-        <Button size="sm" disabled={!installer.ip || installer.sending} loading={installer.sending} onclick={installer.send}>
+        <Button size="sm" disabled={!installer.canSendPayload} loading={installer.sending} onclick={installer.send}>
           {installer.sending ? t.connection.sending : t.connection.sendPayload}
         </Button>
       </div>
