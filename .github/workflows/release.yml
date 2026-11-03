@@ -200,7 +200,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential curl wget file unzip patchelf tcl zsync \
+            build-essential curl wget file unzip patchelf tcl zsync dpkg fakeroot \
             libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev
 
       - name: Check the version
@@ -219,14 +219,14 @@ jobs:
           cargo clippy --manifest-path app/src-tauri/Cargo.toml --all-targets -- -D warnings
           cargo test --manifest-path app/src-tauri/Cargo.toml
 
-      - name: Build the AppImage
+      - name: Build the bundles
         env:
           Y2JB_PAYLOAD_PREBUILT: "1"
         run: |
           cd app
-          npx tauri build --bundles appimage
+          npx tauri build --bundles appimage deb
 
-      - name: Add AppImage update information
+      - name: Normalize bundle names
         run: |
           case "${{ matrix.arch }}" in
             amd64) tool_arch=x86_64; asset_arch=amd64 ;;
@@ -234,6 +234,14 @@ jobs:
             *) echo "unsupported architecture"; exit 1 ;;
           esac
           bash scripts/appimage-update.sh "$tool_arch" "$asset_arch"
+          version="$(cat VERSION)"
+          deb="$(find app/src-tauri/target/release/bundle/deb -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          if [[ -z "$deb" ]]; then
+            echo "Debian package was not produced" >&2
+            exit 1
+          fi
+          dpkg-deb --field "$deb" Package Architecture Version
+          mv "$deb" "y2jb-installer_${version}_linux-${asset_arch}.deb"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -242,6 +250,7 @@ jobs:
           path: |
             app/src-tauri/target/release/bundle/appimage/*.AppImage
             app/src-tauri/target/release/bundle/appimage/*.AppImage.zsync
+            y2jb-installer_*_linux-*.deb
 
   windows:
     needs: payload

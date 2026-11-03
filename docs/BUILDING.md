@@ -109,6 +109,22 @@ scripts/appimage-update.sh x86_64 amd64   # use aarch64/aarch64 on arm64
 information and creates the matching `.zsync` file. It is also run by the Linux
 release workflow.
 
+**Linux Debian package**
+
+```sh
+sudo apt-get install -y dpkg fakeroot
+cd app
+npx tauri build --bundles deb
+cd ..
+version="$(cat VERSION)"
+mv app/src-tauri/target/release/bundle/deb/*.deb \
+  "y2jb-installer_${version}_linux-amd64.deb"   # use linux-aarch64 on arm64
+```
+
+The `.deb` is architecture-specific; build it separately on each target
+architecture. The release workflow builds and renames an amd64 and an aarch64
+package.
+
 **Windows executable**
 
 ```sh

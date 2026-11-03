@@ -4,7 +4,7 @@
 
 ### Added
 
-- Debian package (`.deb`) for Debian/Ubuntu distributions.
+- Debian packages (`.deb`) for Debian/Ubuntu on amd64 and arm64.
 - Option to select custom repositories for `download0.dat`.
 - Signed universal Android APK in release artifacts.
 - Android build documentation and signing instructions.

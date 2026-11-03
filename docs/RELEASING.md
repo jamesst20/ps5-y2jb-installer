@@ -30,13 +30,13 @@
    |---|---|
    | `payload` | Shared PS5 payload ELF |
    | `macos` | Universal DMG |
-   | `linux` | AppImage and AppImage `.zsync` for amd64 and arm64 |
+   | `linux` | AppImage, AppImage `.zsync`, and `.deb` packages for amd64 and arm64 |
    | `windows` | Windows x64 ZIP |
    | `android` | Signed universal APK |
 
 5. Check the draft release:
 
-   - All platform artifacts and AppImage `.zsync` files are attached.
+   - All platform artifacts, `.deb` packages, and AppImage `.zsync` files are attached.
    - The application reports the expected version.
    - The DMG, Windows ZIP, Linux packages, and Android APK launch and connect to a console.
    - AppImageUpdate can discover the latest AppImage from the GitHub release.
