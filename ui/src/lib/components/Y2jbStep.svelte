@@ -4,6 +4,7 @@
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
+  import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
   import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
   } from '$lib/components/ui/select/index.js';
@@ -170,13 +171,33 @@
         <span>{formatBytes(installer.selectedRelease.size)}</span>
         <span>·</span>
         <span>{t.y2jb.published} {installer.selectedRelease.published_at.slice(0, 10)}</span>
+        {#if installer.selectedIsLatest}
+          <Badge class="border-success/30 bg-success/10 text-success">{t.y2jb.latest}</Badge>
+        {:else if installer.selectedRelease.prerelease}
+          <Badge variant="outline">{t.y2jb.prerelease}</Badge>
+        {/if}
       </div>
+    {/if}
+
+    {#if installer.cache?.download0 && installer.selectedTag && !installer.cacheTag}
+      <Alert class="border-warning/40 bg-warning/10">
+        <AlertDescription class="text-warning">
+          {t.y2jb.cacheUnknownRelease(installer.selectedTag)}
+        </AlertDescription>
+      </Alert>
+    {:else if installer.cacheTag && installer.selectedTag && !installer.cacheMatchesSelection}
+      <Alert class="border-warning/40 bg-warning/10">
+        <AlertDescription class="text-warning">
+          {t.y2jb.cacheMismatch(installer.cacheTag, installer.selectedTag)}
+        </AlertDescription>
+      </Alert>
     {/if}
 
     <div class="flex flex-wrap gap-2">
       <Button
         size="sm"
-        disabled={!installer.selectedTag || installer.busy !== ''}
+        variant="outline"
+        disabled={!installer.desktop || !installer.selectedTag || installer.busy !== ''}
         loading={installer.busy === 'download0-fetch'}
         onclick={installer.getDownload0}
       >

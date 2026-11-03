@@ -67,6 +67,8 @@ export class Installer {
   releasesLoading = $state(false);
   releasesError = $state(false);
   selectedTag = $state('');
+  customRepos = $state([]);
+  activeRepo = $state('itsPLK/ps5-y2jb-autoloader');
   transfer = $state(null);
   busy = $state('');
   rebootPending = $state(false);

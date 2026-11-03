@@ -19,6 +19,8 @@ The console does not need outbound internet access. The application fetches Sony
 
 - Offline local account activation and fake PSN sign-in.
 - Firmware-aware YouTube build selection for firmware **4.03 – 13.60**.
+  - Firmware 12.60–13.60 uses `v01.000.030`. It only requires FW 12.20 and still triggers the cached Y2JB splash.
+  - `v01.009.253` is kept pinned for manual use, but is not auto-selected on 13.40+: its newer onboarding can open YouTube straight on the Welcome screen, skipping `download0.dat`.
 - Verified Sony PKG downloads, package joining, and installation.
 - `download0.dat` release selection with local/console version reporting and update detection.
 - In-place YouTube update blocking with timestamped `appinfo.db` backups.
@@ -86,7 +88,6 @@ To install the Debian/Ubuntu package:
 sudo dpkg -i y2jb-installer_<version>_amd64.deb
 sudo apt-get install -f # to resolve missing dependencies if any
 ```
-
 
 Make the AppImage executable and run it. The AppImage requires FUSE; use `--appimage-extract-and-run` if FUSE is unavailable. The AppImage includes GitHub Releases update information and can be updated with AppImageUpdate; the matching `.zsync` file is published next to it.
 
