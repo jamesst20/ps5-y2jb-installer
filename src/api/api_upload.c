@@ -35,6 +35,7 @@ static int upload_sink_begin(const char *method, const char *url, const char *qu
   (void)url;
 
   char slot[16];
+  char title_id[TITLE_ID_CAP] = "";
   char sha256[65];
   if (query_value(query, "slot", slot, sizeof slot) != 0) {
     snprintf(why, cap, "slot is required");
@@ -44,7 +45,8 @@ static int upload_sink_begin(const char *method, const char *url, const char *qu
     snprintf(why, cap, "sha256 is required");
     return -1;
   }
-  return upload_begin(slot, length, sha256, why, cap);
+  query_value(query, "title_id", title_id, sizeof title_id);
+  return upload_begin(slot, title_id[0] ? title_id : NULL, length, sha256, why, cap);
 }
 
 static const http_body_sink_t UPLOAD_SINK = {

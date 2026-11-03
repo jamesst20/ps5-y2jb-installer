@@ -13,7 +13,8 @@ typedef struct {
   char excerpt[512];         /* first bytes of app.json */
 } installed_info_t;
 
-/* Reads the YouTube title directory. Absent fields are "" or -1. */
-void installed_read(installed_info_t *out);
+/* Reads a YouTube title's directory. Absent fields are "" or -1. An unknown title ID
+ * reports not installed. */
+void installed_read(const char *title_id, installed_info_t *out);
 
 #endif

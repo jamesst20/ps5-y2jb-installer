@@ -4,7 +4,7 @@
 
 #include "http/http_server.h"
 
-/* POST /api/download0/remove. */
-http_reply_t api_download0_remove(void);
+/* POST /api/download0/remove, body {"title_id": "..."}. */
+http_reply_t api_download0_remove(const char *body, size_t body_len);
 
 #endif

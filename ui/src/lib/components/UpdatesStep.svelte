@@ -25,13 +25,30 @@
   <div class="flex flex-col gap-3">
     <div class="flex items-center justify-between text-sm">
       <span>{t.updates.hint}</span>
-      <Badge variant={installer.status.youtube.updates === 'blocked' ? 'secondary' : 'outline'}>
-        {installer.status.youtube.updates === 'blocked' ? t.updates.blocked : t.updates.notBlocked}
+      <Badge variant={installer.stepDone.updates ? 'secondary' : 'outline'}>
+        {installer.stepDone.updates ? t.updates.blocked : t.updates.notBlocked}
       </Badge>
     </div>
+    {#if installer.installedRegions.length > 0}
+      <div class="flex flex-col gap-1">
+        {#each installer.installedRegions as row (row.title_id)}
+          <div class="flex items-center justify-between text-xs">
+            <span>
+              {t.youtube.regions[row.region] ?? row.region}
+              <span class="font-mono text-muted-foreground">{row.title_id}</span>
+            </span>
+            <span class={row.status?.updates === 'blocked' ? 'text-success' : 'text-muted-foreground'}>
+              {row.status?.updates === 'blocked' ? t.updates.blocked : t.updates.notBlocked}
+            </span>
+          </div>
+        {/each}
+      </div>
+    {:else}
+      <p class="text-xs text-muted-foreground">{t.common.notInstalled}</p>
+    {/if}
     <Button
       class="self-start"
-      disabled={!installer.kernelReady || installer.busy !== '' || !installer.installed?.installed || installer.status.youtube.updates === 'blocked'}
+      disabled={!installer.kernelReady || installer.busy !== '' || installer.installedRegions.length === 0 || installer.stepDone.updates}
       onclick={() => (installer.confirmBlock = true)}
     >
       {t.updates.block}

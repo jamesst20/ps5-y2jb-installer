@@ -18,6 +18,7 @@ http_reply_t api_youtube_install(const char *body, size_t body_len) {
   }
 
   char digest[65] = "";
+  char title_id[TITLE_ID_CAP] = "";
   if (body_len > 0) {
     cJSON *root = cJSON_ParseWithLength(body, body_len);
     if (root) {
@@ -25,11 +26,19 @@ http_reply_t api_youtube_install(const char *body, size_t body_len) {
       if (cJSON_IsString(item) && item->valuestring) {
         snprintf(digest, sizeof digest, "%s", item->valuestring);
       }
+      const cJSON *title = cJSON_GetObjectItemCaseSensitive(root, "title_id");
+      if (cJSON_IsString(title) && title->valuestring) {
+        snprintf(title_id, sizeof title_id, "%s", title->valuestring);
+      }
       cJSON_Delete(root);
     }
   }
 
-  if (install_start(upload_merged_path(), digest[0] ? digest : NULL, 1) != 0) {
+  if (title_index(title_id) < 0) {
+    return result_reply(400, 0, "Choose a supported YouTube region first.");
+  }
+
+  if (install_start(title_id, upload_merged_path(), digest[0] ? digest : NULL, 1) != 0) {
     return result_reply(409, 0, "An install is already running.");
   }
   return result_reply(200, 1, "Installing YouTube.");

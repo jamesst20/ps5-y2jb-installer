@@ -21,6 +21,7 @@ fn put(
     cancel: &AtomicBool,
     ip: &str,
     slot: &str,
+    title_id: Option<&str>,
     path: &Path,
     label: &str,
 ) -> Result<u64, String> {
@@ -36,9 +37,13 @@ fn put(
     socket.set_write_timeout(Some(Duration::from_secs(60))).ok();
     socket.set_read_timeout(Some(Duration::from_secs(20))).ok();
 
+    let title_query = match title_id {
+        Some(title) => format!("&title_id={title}"),
+        None => String::new(),
+    };
     write!(
         socket,
-        "PUT /api/upload?slot={slot}&sha256={sha256} HTTP/1.1\r\n\
+        "PUT /api/upload?slot={slot}&sha256={sha256}{title_query} HTTP/1.1\r\n\
          Host: {ip}\r\n\
          Content-Type: application/octet-stream\r\n\
          Content-Length: {size}\r\n\
@@ -114,6 +119,7 @@ async fn upload(
     app: &AppHandle,
     ip: &str,
     slot: &str,
+    title_id: Option<&str>,
     path: &Path,
     label: &str,
 ) -> Result<u64, String> {
@@ -124,11 +130,22 @@ async fn upload(
     let progress = transfer::emitter(app);
     let ip = ip.to_string();
     let slot = slot.to_string();
+    let title_id = title_id.map(|title| title.to_string());
     let label = label.to_string();
     let path = path.to_path_buf();
-    tokio::task::spawn_blocking(move || put(&progress, &cancel, &ip, &slot, &path, &label))
-        .await
-        .map_err(|error| error.to_string())?
+    tokio::task::spawn_blocking(move || {
+        put(
+            &progress,
+            &cancel,
+            &ip,
+            &slot,
+            title_id.as_deref(),
+            &path,
+            &label,
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -146,16 +163,20 @@ pub async fn upload_merged(
     }
     let root = paths::data_dir(&app)?;
     let path = paths::merged_pkg(&root, &build, &region);
-    upload(&app, &ip, "merged", &path, "merged").await
+    upload(&app, &ip, "merged", None, &path, "merged").await
 }
 
 #[tauri::command]
-pub async fn upload_download0(app: AppHandle, ip: String) -> Result<u64, String> {
+pub async fn upload_download0(app: AppHandle, ip: String, title_id: String) -> Result<u64, String> {
+    if !manifest::has_title(&title_id) {
+        return Err("unknown YouTube title".into());
+    }
     let root = paths::data_dir(&app)?;
     upload(
         &app,
         &ip,
         "download0",
+        Some(&title_id),
         &paths::download0_file(&root),
         "download0",
     )
@@ -169,6 +190,7 @@ pub async fn upload_fakesignin(app: AppHandle, ip: String) -> Result<u64, String
         &app,
         &ip,
         "fakesignin",
+        None,
         &paths::fakesignin_file(&root),
         "fakesignin",
     )
@@ -197,7 +219,7 @@ mod tests {
         let data: Vec<u8> = (0..1024 * 1024).map(|i| (i % 251) as u8).collect();
         std::fs::write(&path, &data).unwrap();
         let cancel = AtomicBool::new(false);
-        let sent = put(&|_| {}, &cancel, &ip, "fakesignin", &path, "test");
+        let sent = put(&|_| {}, &cancel, &ip, "fakesignin", None, &path, "test");
         std::fs::remove_file(&path).ok();
         assert_eq!(sent.unwrap(), data.len() as u64);
     }

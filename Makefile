@@ -16,6 +16,7 @@ PURE_SRCS := \
 
 DEVICE_SRCS := \
 	src/main.c \
+	src/titles.c \
 	src/api/api_router.c \
 	src/api/api_status.c \
 	src/api/api_accounts.c \
@@ -63,7 +64,7 @@ PAYLOAD_LIBS := -Lbuild/prefix/lib \
 
 TEST_SRCS := $(wildcard tests/test_*.c)
 TEST_BINS := $(patsubst tests/%.c,build/test/%,$(TEST_SRCS))
-TEST_EXTRA_test_download0 := src/device/download0.c
+TEST_EXTRA_test_download0 := src/device/download0.c src/titles.c
 TEST_LIBS_test_download0 := -lpthread
 
 UI_INPUTS := $(shell find ui/src -type f) \

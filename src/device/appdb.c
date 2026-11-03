@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "paths.h"
+#include "titles.h"
 #include "crypto/sha256.h"
 #include "sqlite3.h"
 
@@ -15,7 +16,6 @@
 #define STORE_DIR WORK_DIR "/store"
 #define BACKUP_PREFIX STORE_DIR "/appinfo.db.bak-"
 
-#define YOUTUBE_TITLE_ID "PPSA01650"
 #define BLOCKED_CONTENT_VERSION "99.999.999"
 #define BLOCKED_VERSION_FILE_URI "http://localhost"
 
@@ -75,27 +75,27 @@ static int make_backup(char *path, size_t cap) {
   return 0;
 }
 
-static int set_value(sqlite3 *db, const char *key, const char *value) {
+static int set_value(sqlite3 *db, const char *title_id, const char *key, const char *value) {
   sqlite3_stmt *st = NULL;
   if (sqlite3_prepare_v2(db, "UPDATE tbl_appinfo SET val = ? WHERE titleId = ? AND key = ?", -1, &st, NULL) !=
       SQLITE_OK) {
     return -1;
   }
   sqlite3_bind_text(st, 1, value, -1, SQLITE_STATIC);
-  sqlite3_bind_text(st, 2, YOUTUBE_TITLE_ID, -1, SQLITE_STATIC);
+  sqlite3_bind_text(st, 2, title_id, -1, SQLITE_STATIC);
   sqlite3_bind_text(st, 3, key, -1, SQLITE_STATIC);
   int ok = sqlite3_step(st) == SQLITE_DONE && sqlite3_changes(db) == 1;
   sqlite3_finalize(st);
   return ok ? 0 : -1;
 }
 
-static int read_value(sqlite3 *db, const char *key, char *out, size_t cap) {
+static int read_value(sqlite3 *db, const char *title_id, const char *key, char *out, size_t cap) {
   sqlite3_stmt *st = NULL;
   if (sqlite3_prepare_v2(db, "SELECT val FROM tbl_appinfo WHERE titleId = ? AND key = ?", -1, &st, NULL) !=
       SQLITE_OK) {
     return -1;
   }
-  sqlite3_bind_text(st, 1, YOUTUBE_TITLE_ID, -1, SQLITE_STATIC);
+  sqlite3_bind_text(st, 1, title_id, -1, SQLITE_STATIC);
   sqlite3_bind_text(st, 2, key, -1, SQLITE_STATIC);
   int rows = 0;
   while (sqlite3_step(st) == SQLITE_ROW) {
@@ -109,20 +109,35 @@ static int read_value(sqlite3 *db, const char *key, char *out, size_t cap) {
   return rows == 1 ? 0 : -1;
 }
 
-static int values_match(const char *path) {
+static int values_match_db(sqlite3 *db, const char *title_id) {
+  char version[64], uri[256];
+  if (read_value(db, title_id, "CONTENT_VERSION", version, sizeof version) != 0 ||
+      read_value(db, title_id, "VERSION_FILE_URI", uri, sizeof uri) != 0) {
+    return -1;
+  }
+  return strcmp(version, BLOCKED_CONTENT_VERSION) == 0 &&
+         strcmp(uri, BLOCKED_VERSION_FILE_URI) == 0;
+}
+
+static int values_match(const char *path, const char *title_id) {
   sqlite3 *db = NULL;
   if (sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL) != SQLITE_OK) {
     sqlite3_close(db);
     return -1;
   }
-  char version[64], uri[256];
-  int ok = read_value(db, "CONTENT_VERSION", version, sizeof version) == 0 &&
-           read_value(db, "VERSION_FILE_URI", uri, sizeof uri) == 0;
+  int match = values_match_db(db, title_id);
   sqlite3_close(db);
-  if (!ok) {
-    return -1;
+  return match;
+}
+
+static int installed_titles(void) {
+  int count = 0;
+  for (int i = 0; i < TITLE_COUNT; i++) {
+    if (title_has_app(TITLES[i].title_id)) {
+      count++;
+    }
   }
-  return strcmp(version, BLOCKED_CONTENT_VERSION) == 0 && strcmp(uri, BLOCKED_VERSION_FILE_URI) == 0;
+  return count;
 }
 
 static int edit_live(char *msg, size_t cap) {
@@ -136,9 +151,29 @@ static int edit_live(char *msg, size_t cap) {
 
   int rc = -1;
   if (sqlite3_exec(db, "BEGIN IMMEDIATE", NULL, NULL, NULL) == SQLITE_OK) {
-    if (set_value(db, "CONTENT_VERSION", BLOCKED_CONTENT_VERSION) == 0 &&
-        set_value(db, "VERSION_FILE_URI", BLOCKED_VERSION_FILE_URI) == 0 &&
-        sqlite3_exec(db, "COMMIT", NULL, NULL, NULL) == SQLITE_OK) {
+    int patched = 0;
+    for (int i = 0; i < TITLE_COUNT; i++) {
+      const char *title_id = TITLES[i].title_id;
+      if (!title_has_app(title_id)) {
+        continue;
+      }
+      if (set_value(db, title_id, "CONTENT_VERSION", BLOCKED_CONTENT_VERSION) != 0 ||
+          set_value(db, title_id, "VERSION_FILE_URI", BLOCKED_VERSION_FILE_URI) != 0) {
+        break;
+      }
+      patched++;
+    }
+    int verified = patched > 0;
+    if (verified) {
+      for (int i = 0; i < TITLE_COUNT; i++) {
+        if (title_has_app(TITLES[i].title_id) &&
+            values_match_db(db, TITLES[i].title_id) != 1) {
+          verified = 0;
+          break;
+        }
+      }
+    }
+    if (verified && sqlite3_exec(db, "COMMIT", NULL, NULL, NULL) == SQLITE_OK) {
       rc = 0;
     } else {
       sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
@@ -151,8 +186,11 @@ static int edit_live(char *msg, size_t cap) {
   return rc;
 }
 
-appdb_updates_t appdb_youtube_updates(void) {
-  int match = values_match(LIVE_PATH);
+appdb_updates_t appdb_youtube_updates(const char *title_id) {
+  if (title_index(title_id) < 0) {
+    return APPDB_UNKNOWN;
+  }
+  int match = values_match(LIVE_PATH, title_id);
   if (match == 1) {
     return APPDB_BLOCKED;
   }
@@ -163,6 +201,11 @@ appdb_updates_t appdb_youtube_updates(void) {
 }
 
 int appdb_block_youtube_updates(char *msg, size_t cap) {
+  int installed = installed_titles();
+  if (installed == 0) {
+    snprintf(msg, cap, "YouTube is not installed in any region, so there are no updates to block.");
+    return -1;
+  }
   char backup[256];
   if (make_backup(backup, sizeof backup) != 0) {
     snprintf(msg, cap, "Could not back up appinfo.db to the store; nothing was changed.");
@@ -171,9 +214,12 @@ int appdb_block_youtube_updates(char *msg, size_t cap) {
   if (edit_live(msg, cap) != 0) {
     return -1;
   }
-  if (values_match(LIVE_PATH) != 1) {
-    snprintf(msg, cap, "The YouTube rows did not read back as blocked; the backup is in the store.");
-    return -1;
+  for (int i = 0; i < TITLE_COUNT; i++) {
+    const char *title_id = TITLES[i].title_id;
+    if (title_has_app(title_id) && values_match(LIVE_PATH, title_id) != 1) {
+      snprintf(msg, cap, "The YouTube rows did not read back as blocked; the backup is in the store.");
+      return -1;
+    }
   }
   snprintf(msg, cap, "YouTube updates are blocked. Backup kept: %s", backup);
   return 0;

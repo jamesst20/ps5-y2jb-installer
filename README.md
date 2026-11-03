@@ -22,7 +22,7 @@ The console does not need outbound internet access. The application fetches Sony
   - Firmware 12.60–13.60 uses `v01.000.030`. It only requires FW 12.20 and still triggers the cached Y2JB splash.
   - `v01.009.253` is kept pinned for manual use, but is not auto-selected on 13.40+: its newer onboarding can open YouTube straight on the Welcome screen, skipping `download0.dat`.
 - Verified Sony PKG downloads, package joining, and installation.
-- `download0.dat` release selection with local/console version reporting and update detection.
+- Per-region `download0.dat` release selection with local/console version reporting and update detection.
 - In-place YouTube update blocking with timestamped `appinfo.db` backups.
 - LAN discovery and manual console connection.
 - Local download cache with per-artifact status and cleanup.
@@ -103,9 +103,9 @@ Download the APK and open it on the device, allowing installation from unknown s
 1. Start the exploit and the ELF loader on the console.
 2. Open the application, scan the LAN, and select the console. If only the loader answers, click **Send payload** to start the embedded payload.
 3. **Accounts** — activate a local user, then run the fake sign-in; the application uploads `np-fake-signin-ps5.elf`, sends it to the loader on port 9021, and removes the console-side copy. The loader must still be running; restart elfdr if it was closed.
-4. **YouTube** — select the region. The application detects the firmware, selects the matching build, fetches and verifies both PKGs, joins them, uploads the result, and starts the installation. The merged PKG is deleted when the job finishes.
-5. **Y2JB** — select a `download0.dat` release, fetch it, and upload it. The panel reports the release installed on the console, the release cached locally, and whether an update is available.
-6. **Block updates** — confirm the dialog. The payload edits `/system_data/priv/mms/appinfo.db` in place, keeps a timestamped backup, and reboots the console. This is the final setup action; the same reboot also applies account activation and fake sign-in.
+4. **YouTube** — the application detects the firmware and selects the matching build. Each region (USA, Europe, Japan) is a separate row: fetch and verify that region's PKGs, join them, upload the result, and install it. Set up only the regions you want. The merged PKG is deleted when the job finishes.
+5. **Y2JB** — each installed region gets its own `download0.dat` release picker. Fetch and upload a release per region; different regions can use different versions. Each row reports the release installed on the console, the release cached locally, and whether an update is available.
+6. **Block updates** — confirm the dialog. The payload edits `/system_data/priv/mms/appinfo.db` in place for every installed YouTube region, keeps one timestamped backup, and reboots the console. This is the final setup action; the same reboot also applies account activation and fake sign-in.
 7. Disconnect the console from the internet, then launch YouTube to trigger Y2JB. Opening YouTube online can show the sign-in screen and overwrite `download0.dat`.
 
 The payload does not survive a reboot. To perform another action after restarting, start the exploit and the ELF loader again and resend the payload from the application.
@@ -127,7 +127,7 @@ The cache can be cleared from the application. Removing the application does not
 
 ### Console
 
-- The placed file at `/user/download/PPSA01650/download0.dat` is the intended Y2JB artifact.
+- The placed file at `/user/download/<title_id>/download0.dat` is the intended Y2JB artifact, one per installed YouTube region (`PPSA01650`, `PPSA01651`, `PPSA01652`).
 - Timestamped `appinfo.db` backups are kept under `/data/y2jb-installer/store`.
 - Temporary uploads live under `/data/y2jb-installer/tmp` and are removed after use or by the startup cleanup.
 - No installer settings, credentials, or resume state are stored on the console.

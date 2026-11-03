@@ -10,11 +10,12 @@ typedef enum {
   APPDB_UNKNOWN,
 } appdb_updates_t;
 
-/* Reads YouTube's update-block state without modifying appinfo.db. */
-appdb_updates_t appdb_youtube_updates(void);
+/* Reads one YouTube title's update-block state without modifying appinfo.db. */
+appdb_updates_t appdb_youtube_updates(const char *title_id);
 
-/* Backs up appinfo.db to a new timestamped file, then edits the live database in place so
- * its ownership, mode and inode are preserved. Returns 0, or -1 with the reason in msg. */
+/* Backs up appinfo.db to a new timestamped file, then edits every installed YouTube title in
+ * place so its ownership, mode and inode are preserved. Returns 0, or -1 with the reason in
+ * msg. */
 int appdb_block_youtube_updates(char *msg, size_t cap);
 
 #endif

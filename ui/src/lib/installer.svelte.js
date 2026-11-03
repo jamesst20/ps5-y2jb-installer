@@ -62,18 +62,18 @@ export class Installer {
 
   manifest = $state(null);
   build = $state('');
-  region = $state('usa');
   cache = $state(null);
   cacheLoading = $state(true);
   releases = $state([]);
   releasesLoading = $state(false);
   releasesError = $state(false);
   releasesLoaded = $state(false);
-  selectedTag = $state('');
+  download0Tags = $state({});
   customRepos = $state([]);
   activeRepo = $state(OFFICIAL_DOWNLOAD0_REPO);
   transfer = $state(null);
   busy = $state('');
+  busyRegion = $state('');
   rebootPending = $state(false);
   confirmBlock = $state(false);
   initialized = $state(false);
@@ -102,17 +102,8 @@ export class Installer {
     this.manifest?.builds?.find((entry) => entry.build === this.build) ?? null,
   );
   regions = $derived(this.selectedBuild?.regions ?? []);
-  selectedRegion = $derived(
-    this.regions.find((entry) => entry.region === this.region) ?? null,
-  );
-  cachedPkg = $derived(
-    this.cache?.pkgs?.find(
-      (entry) => entry.build === this.build && entry.region === this.region,
-    ) ?? null,
-  );
-  latestTag = $derived(this.releases.find((release) => !release.prerelease)?.tag ?? '');
-  selectedRelease = $derived(
-    this.releases.find((release) => release.tag === this.selectedTag) ?? null,
+  latestTag = $derived(
+    this.releases.find((release) => !release.prerelease)?.tag ?? this.releases[0]?.tag ?? '',
   );
   releaseItems = $derived(
     this.releases.map((release) => ({
@@ -120,11 +111,6 @@ export class Installer {
       label: formatReleaseLabel(release, this.latestTag, t),
     })),
   );
-
-  // The image carries its own release string, so it stays identifiable after YouTube writes
-  // into the mounted filesystem. The version is not derived from a whole-file hash.
-  installedVersion = $derived(this.status?.files?.download0?.version ?? '');
-  installedVersionState = $derived(this.status?.files?.download0?.version_state ?? '');
 
   // The cached file is identified by its real digest, matched against the release list.
   // A digest that is not listed is shown as an unknown version instead of a guess.
@@ -141,40 +127,81 @@ export class Installer {
     return this.cacheTag || t.y2jb.unknownVersion;
   });
 
-  cacheMatchesSelection = $derived(!!this.cacheTag && this.cacheTag === this.selectedTag);
-  updateAvailable = $derived(
-    !!this.installedVersion && !!this.latestTag && this.installedVersion !== this.latestTag,
-  );
-  selectedIsLatest = $derived(
-    !!this.selectedTag && this.selectedTag === this.latestTag,
+  youtubeRows = $derived.by(() =>
+    this.regions.map((entry) => {
+      const status =
+        (this.status?.youtube?.regions ?? []).find(
+          (row) => row.title_id === entry.title_id,
+        ) ?? null;
+      const cached =
+        (this.cache?.pkgs ?? []).find(
+          (pkg) => pkg.build === this.build && pkg.region === entry.region,
+        ) ?? null;
+      const match = status?.package_digest
+        ? ((this.manifest?.builds ?? [])
+            .flatMap((build) =>
+              build.regions.map((region) => ({ build: build.build, ...region })),
+            )
+            .find((candidate) => candidate.package_digest === status.package_digest) ?? null)
+        : null;
+      const alreadyInstalled =
+        status?.installed === true &&
+        match !== null &&
+        match.build === this.build &&
+        match.region === entry.region;
+      const job = this.status?.jobs?.install ?? null;
+      const installJob =
+        job && job.title_id === entry.title_id && job.state !== 'idle' ? job : null;
+      return { ...entry, status, cached, alreadyInstalled, installJob };
+    }),
   );
 
-  installedLabel = $derived.by(() => {
-    if (!this.status?.files?.download0?.present) return t.common.notInstalled;
-    if (this.installedVersionState === 'computing') return t.common.computing;
-    return this.installedVersion || t.y2jb.unknownVersion;
-  });
+  download0Rows = $derived.by(() =>
+    this.regions.map((entry) => {
+      const status =
+        (this.status?.files?.download0 ?? []).find(
+          (row) => row.title_id === entry.title_id,
+        ) ?? null;
+      const selectedTag = this.tagFor(entry.region);
+      const selectedRelease =
+        this.releases.find((release) => release.tag === selectedTag) ?? null;
+      const cacheMatches = !!this.cacheTag && this.cacheTag === selectedTag;
+      const youtube = (this.status?.youtube?.regions ?? []).find(
+        (row) => row.title_id === entry.title_id,
+      );
+      const version = status?.version ?? '';
+      const versionState = status?.version_state ?? '';
+      const valid = status?.y2jb ?? (status?.version_state === 'ready');
+      // Upstream Gezine version strings such as "Y2JB 1.7 by Gezine" are not release tags,
+      // so do not compare them with the repository's latest tag.
+      const releaseComparable = /^[vV0-9]/.test(version);
+      const installedLabel = !status?.present
+        ? t.common.notInstalled
+        : versionState === 'computing'
+          ? t.common.computing
+          : valid
+            ? version || t.y2jb.unknownVersion
+            : t.y2jb.notY2jb;
+      return {
+        ...entry,
+        status,
+        selectedTag,
+        selectedRelease,
+        cacheMatches,
+        youtubeInstalled: youtube?.installed === true,
+        valid,
+        installedLabel,
+        updateAvailable:
+          valid && releaseComparable && !!version && !!this.latestTag && version !== this.latestTag,
+        upToDate:
+          valid && releaseComparable && !!version && !!this.latestTag && version === this.latestTag,
+        selectedIsLatest: !!selectedTag && selectedTag === this.latestTag,
+      };
+    }),
+  );
 
-  installed = $derived(this.status?.youtube ?? null);
   internetOnline = $derived(this.status?.internet === true);
 
-  installedMatch = $derived.by(() => {
-    if (!this.installed?.package_digest) return null;
-    return (
-      (this.manifest?.builds ?? [])
-        .flatMap((entry) => entry.regions.map((r) => ({ build: entry.build, ...r })))
-        .find((entry) => entry.package_digest === this.installed.package_digest) ?? null
-    );
-  });
-
-  alreadyInstalled = $derived(
-    this.installed?.installed === true &&
-      this.installedMatch !== null &&
-      this.installedMatch.build === this.build &&
-      this.installedMatch.region === this.region,
-  );
-
-  installJob = $derived(this.status?.jobs?.install ?? null);
   jobRunning = $derived(
     this.status?.jobs?.upload?.state === 'running' ||
       this.status?.jobs?.install?.state === 'running',
@@ -183,13 +210,22 @@ export class Installer {
     this.reachable && this.appVersion !== '' && this.status.version !== this.appVersion,
   );
 
+  installedRegions = $derived(
+    this.youtubeRows.filter((row) => row.status?.installed === true),
+  );
+  readyRegions = $derived(
+    this.download0Rows.filter((row) => row.valid === true),
+  );
+
   stepDone = $derived({
     accounts: this.accounts.some(
       (account) => account.logged_in && account.activated && account.signed_in,
     ),
-    youtube: this.installed?.installed === true,
-    y2jb: this.status?.files?.download0?.present === true,
-    updates: this.status?.youtube?.updates === 'blocked',
+    youtube: this.installedRegions.length > 0,
+    y2jb: this.readyRegions.length > 0,
+    updates:
+      this.installedRegions.length > 0 &&
+      this.installedRegions.every((row) => row.status?.updates === 'blocked'),
   });
   completed = $derived(Object.values(this.stepDone).filter(Boolean).length);
   selectedAccount = $derived(
@@ -197,12 +233,6 @@ export class Installer {
   );
   accountItems = $derived(
     this.accounts.map((account) => ({ value: String(account.slot), label: account.name })),
-  );
-  regionItems = $derived(
-    this.regions.map((entry) => ({
-      value: entry.region,
-      label: t.youtube.regions[entry.region] ?? entry.region,
-    })),
   );
 
   accountsSummary = $derived(
@@ -212,21 +242,16 @@ export class Installer {
       .join(', '),
   );
   youtubeSummary = $derived(
-    this.installedMatch
-      ? `${this.installedMatch.build} · ${t.youtube.regions[this.installedMatch.region] ?? this.installedMatch.region}`
-      : this.installed?.installed
-        ? t.youtube.installed
-        : '',
+    this.installedRegions
+      .map((row) => t.youtube.regions[row.region] ?? row.region)
+      .join(', '),
   );
   y2jbSummary = $derived(
-    this.status?.files?.download0?.present
-      ? this.installedVersion ||
-        (this.installedVersionState === 'computing' ? t.common.computing : t.y2jb.done)
-      : '',
+    this.readyRegions
+      .map((row) => t.youtube.regions[row.region] ?? row.region)
+      .join(', '),
   );
-  updatesSummary = $derived(
-    this.status?.youtube?.updates === 'blocked' ? t.updates.blocked : '',
-  );
+  updatesSummary = $derived(this.stepDone.updates ? t.updates.blocked : '');
 
   youtubeTransfer = $derived(
     this.transfer && ['base', 'sc', 'merged'].includes(this.transfer.label)
@@ -239,6 +264,47 @@ export class Installer {
   signinTransfer = $derived(
     this.transfer?.label === 'fakesignin' ? this.transfer : null,
   );
+
+  tagFor = (region) => {
+    const tag = this.download0Tags[region];
+    if (tag && this.releases.some((release) => release.tag === tag)) {
+      return tag;
+    }
+    return this.latestTag;
+  };
+
+  setTag = (region, tag) => {
+    if (!region || !tag) {
+      return;
+    }
+    this.download0Tags = { ...this.download0Tags, [region]: tag };
+  };
+
+  // Keep every region on a release that still exists after a repo change or refresh.
+  ensureTags = () => {
+    const latest = this.latestTag;
+    const next = { ...this.download0Tags };
+    let changed = false;
+    for (const entry of this.regions) {
+      const current = next[entry.region];
+      if (!current || !this.releases.some((release) => release.tag === current)) {
+        if (latest) {
+          next[entry.region] = latest;
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      this.download0Tags = next;
+    }
+  };
+
+  titleFor = (region) => this.regions.find((entry) => entry.region === region) ?? null;
+
+  cacheMatches = (region) => {
+    const tag = this.tagFor(region);
+    return !!this.cacheTag && this.cacheTag === tag;
+  };
 
   start = async () => {
     this.stopped = false;
@@ -335,15 +401,7 @@ export class Installer {
     this.releasesError = false;
     try {
       this.releases = await download0Releases(this.activeRepo);
-      if (
-        !this.selectedTag ||
-        !this.releases.some((release) => release.tag === this.selectedTag)
-      ) {
-        this.selectedTag =
-          this.releases.find((release) => !release.prerelease)?.tag ??
-          this.releases[0]?.tag ??
-          '';
-      }
+      this.ensureTags();
     } catch {
       this.releases = [];
       this.releasesError = true;
@@ -432,17 +490,7 @@ export class Installer {
     }
     const expected = await expectedBuild(this.status.firmware);
     this.build = expected ?? '';
-    const match = this.installedMatch;
-    const available =
-      this.manifest?.builds?.find((entry) => entry.build === this.build)?.regions ?? [];
-    if (match && available.some((entry) => entry.region === match.region)) {
-      this.region = match.region;
-    } else if (
-      available.length > 0 &&
-      !available.some((entry) => entry.region === this.region)
-    ) {
-      this.region = available[0].region;
-    }
+    this.ensureTags();
     this.initialized = true;
   };
 
@@ -622,21 +670,29 @@ export class Installer {
     }
   };
 
-  removeDownload0File = () => this.runAction('y2jb', removeDownload0);
+  removeDownload0File = (region) => {
+    const title = this.titleFor(region);
+    if (!title) {
+      return;
+    }
+    return this.runAction('y2jb', () => removeDownload0(title.title_id));
+  };
 
   blockUpdates = () => this.runAction('updates', blockYoutubeUpdates);
 
-  fetchAndJoin = async () => {
-    if (!this.build) {
+  fetchAndJoin = async (region) => {
+    const entry = this.titleFor(region);
+    if (!this.build || !entry) {
       return;
     }
     this.busy = 'fetch';
+    this.busyRegion = entry.region;
     this.transfer = null;
     this.clearNotice('youtube');
     try {
-      const result = await fetchYoutube(this.build, this.region);
+      const result = await fetchYoutube(this.build, entry.region);
       const pkgs = (this.cache?.pkgs ?? []).filter(
-        (entry) => entry.build !== this.build || entry.region !== this.region,
+        (pkg) => pkg.build !== this.build || pkg.region !== entry.region,
       );
       this.cache = {
         download0: this.cache?.download0 ?? null,
@@ -645,7 +701,7 @@ export class Installer {
           ...pkgs,
           {
             build: this.build,
-            region: this.region,
+            region: entry.region,
             path: result.directory,
             base: true,
             sc: true,
@@ -657,20 +713,23 @@ export class Installer {
       this.notify('youtube', String(error), false);
     } finally {
       this.busy = '';
+      this.busyRegion = '';
       this.transfer = null;
     }
   };
 
-  uploadAndInstall = async () => {
-    if (!this.targetIp || !this.build) {
+  uploadAndInstall = async (region) => {
+    const entry = this.titleFor(region);
+    if (!this.targetIp || !this.build || !entry) {
       return;
     }
     this.busy = 'upload';
+    this.busyRegion = entry.region;
     this.transfer = null;
     this.clearNotice('youtube');
     try {
-      await uploadMerged(this.targetIp, this.build, this.region);
-      const result = await youtubeInstall(this.selectedRegion?.package_digest);
+      await uploadMerged(this.targetIp, this.build, entry.region);
+      const result = await youtubeInstall(entry.package_digest, entry.title_id);
       if (!result.ok) {
         this.notify(
           'youtube',
@@ -682,21 +741,24 @@ export class Installer {
       this.notify('youtube', String(error), false);
     } finally {
       this.busy = '';
+      this.busyRegion = '';
       this.transfer = null;
       await this.refresh();
       this.advance('youtube');
     }
   };
 
-  getDownload0 = async () => {
-    if (!this.selectedTag) {
+  getDownload0 = async (region) => {
+    const tag = this.tagFor(region);
+    if (!tag) {
       return;
     }
     this.busy = 'download0-fetch';
+    this.busyRegion = region;
     this.transfer = null;
     this.clearNotice('y2jb');
     try {
-      const result = await fetchDownload0(this.activeRepo, this.selectedTag);
+      const result = await fetchDownload0(this.activeRepo, tag);
       // The fetch already verified this digest, so publish it immediately instead of
       // hashing the same 336 MB again through cacheStatus.
       this.cache = {
@@ -709,24 +771,28 @@ export class Installer {
       this.notify('y2jb', String(error), false);
     } finally {
       this.busy = '';
+      this.busyRegion = '';
       this.transfer = null;
     }
   };
 
-  sendDownload0 = async () => {
-    if (!this.cacheMatchesSelection) {
+  sendDownload0 = async (region) => {
+    const entry = this.titleFor(region);
+    if (!entry || !this.cacheMatches(region)) {
       return;
     }
     this.busy = 'download0-upload';
+    this.busyRegion = region;
     this.transfer = null;
     this.clearNotice('y2jb');
     try {
-      await uploadDownload0(this.targetIp);
+      await uploadDownload0(this.targetIp, entry.title_id);
       this.notify('y2jb', t.y2jb.done);
     } catch (error) {
       this.notify('y2jb', String(error), false);
     } finally {
       this.busy = '';
+      this.busyRegion = '';
       this.transfer = null;
       await this.refresh();
       this.advance('y2jb');
@@ -817,7 +883,7 @@ export class Installer {
       this.customRepos = [...this.customRepos, slug];
     }
     this.activeRepo = slug;
-    this.selectedTag = '';
+    this.download0Tags = {};
     await setDownload0Repo(this.activeRepo, this.customRepos).catch(() => {});
     await this.loadReleases();
   };
@@ -835,6 +901,7 @@ export class Installer {
     this.rebootPending = false;
     this.confirmBlock = false;
     this.transfer = null;
+    this.busyRegion = '';
     this.accountSlot = '';
     this.notices = {};
     this.openStep = '';

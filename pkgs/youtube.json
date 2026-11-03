@@ -14,21 +14,24 @@
           "filename": "UP4381-PPSA01650_00-YOUTUBESIEA00000_sc.pkg",
           "size": 25690112,
           "sha256": "ec6cdc155fc99d8f7eabdbf3534e2f0e868b90b1d0d3e9f6c0a1290a402d61d0",
-          "package_digest": "D428DCEAC4DA3D439DF61E8344BDDCCFFC57FEFE1431A32C2D2A31AF390E3673"
+          "package_digest": "D428DCEAC4DA3D439DF61E8344BDDCCFFC57FEFE1431A32C2D2A31AF390E3673",
+          "title_id": "PPSA01650"
         },
         "europe": {
           "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01651_00/app/info/7/f_642d948a1fce26e2bfb058a05de64d66fddda8dd1107bce613092e6a473e58a5/EP4381-PPSA01651_00-YOUTUBESIEE00000_sc.pkg",
           "filename": "EP4381-PPSA01651_00-YOUTUBESIEE00000_sc.pkg",
           "size": 25690112,
           "sha256": "eeeb2c520848c403c89c7d7aa4ca7e873cbfb0c2dd7c7db017a0d6bda40910da",
-          "package_digest": "D807BE24498C52FE8A65073181A395F3AABFD05B211BE764E2D200DC74904537"
+          "package_digest": "D807BE24498C52FE8A65073181A395F3AABFD05B211BE764E2D200DC74904537",
+          "title_id": "PPSA01651"
         },
         "japan": {
           "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01652_00/app/info/7/f_f9dbeb331803c693bb35880c27eec20fc4f493344f786df9cd3697d6e384bb23/JA0004-PPSA01652_00-YOUTUBESIEJA0000_sc.pkg",
           "filename": "JA0004-PPSA01652_00-YOUTUBESIEJA0000_sc.pkg",
           "size": 25690112,
           "sha256": "844c6164c259561d214bc408fdf44066e133062a4a976adcc086a9a49dc3de49",
-          "package_digest": "30A1AD8C89436118332329704D66B9214BEDDCBA16EBF531B00D61A51BA67E0E"
+          "package_digest": "30A1AD8C89436118332329704D66B9214BEDDCBA16EBF531B00D61A51BA67E0E",
+          "title_id": "PPSA01652"
         }
       }
     },
@@ -46,21 +49,24 @@
           "filename": "UP4381-PPSA01650_00-YOUTUBESIEA00000_sc.pkg",
           "size": 25690112,
           "sha256": "65b9b067baae372ff4c043807382bd24824d43055fde03fe7ce6147b5c8deea0",
-          "package_digest": "EDF477B20F2BB6852B631297EA5833CE1976879CF429CDC7D80B241564F4CCFC"
+          "package_digest": "EDF477B20F2BB6852B631297EA5833CE1976879CF429CDC7D80B241564F4CCFC",
+          "title_id": "PPSA01650"
         },
         "europe": {
           "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01651_00/app/info/27/f_2c74103fea8b64fbcbece44bb8daa13d766f3443ef81bd5c5c8648421d93d4ce/EP4381-PPSA01651_00-YOUTUBESIEE00000_sc.pkg",
           "filename": "EP4381-PPSA01651_00-YOUTUBESIEE00000_sc.pkg",
           "size": 25690112,
           "sha256": "5b0e29c3904e0d04da5b77eab728307772290db2ea647c01f26db64d5e934ca7",
-          "package_digest": "98668DD37F57AF726A17FD69C78B93B3829DA090F1C349CBDCEABB05A83C5939"
+          "package_digest": "98668DD37F57AF726A17FD69C78B93B3829DA090F1C349CBDCEABB05A83C5939",
+          "title_id": "PPSA01651"
         },
         "japan": {
           "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01652_00/app/info/27/f_639eeccf00d38ca932ee585154aebc9d7d0fda1242fdc02d4485d1dbc2a3753a/JA0004-PPSA01652_00-YOUTUBESIEJA0000_sc.pkg",
           "filename": "JA0004-PPSA01652_00-YOUTUBESIEJA0000_sc.pkg",
           "size": 25690112,
           "sha256": "89c1ab80ead0323732a67ae91bd00f87c6db044a25fdbcd7dfa4f970051a4271",
-          "package_digest": "2885116E76DF53C32329A3F3BE7259B6C2CE96EECFB84D7D4352101F10C6517D"
+          "package_digest": "2885116E76DF53C32329A3F3BE7259B6C2CE96EECFB84D7D4352101F10C6517D",
+          "title_id": "PPSA01652"
         }
       }
     },
@@ -78,21 +84,24 @@
           "filename": "UP4381-PPSA01650_00-YOUTUBESIEA00000_sc.pkg",
           "size": 25690112,
           "sha256": "84a268f0bc88cacbbbe0ca6c5d9f54be81890be6ea377c1c91be821eb6e2cefb",
-          "package_digest": "D68D369DFEB14E2416AD0AA80AC2F61DD0C25545D0550DDC689E4234EF5A5458"
+          "package_digest": "D68D369DFEB14E2416AD0AA80AC2F61DD0C25545D0550DDC689E4234EF5A5458",
+          "title_id": "PPSA01650"
         },
         "europe": {
           "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01651_00/app/info/32/f_6ed4cf5926b476e3c73513a8834cfc0f86f55a4f10d1f8d965730978429799b3/EP4381-PPSA01651_00-YOUTUBESIEE00000_sc.pkg",
           "filename": "EP4381-PPSA01651_00-YOUTUBESIEE00000_sc.pkg",
           "size": 25690112,
           "sha256": "b644fc1ac23c8933c70cf307760d25111cac1c1651762e62838034ed510f1da5",
-          "package_digest": "978AB3D220D59F32D67D552E96200F637220B106CF3719FB28D60B616AA51F57"
+          "package_digest": "978AB3D220D59F32D67D552E96200F637220B106CF3719FB28D60B616AA51F57",
+          "title_id": "PPSA01651"
         },
         "japan": {
           "url": "https://sgst.prod.dl.playstation.net/sgst/prod/00/PPSA01652_00/app/info/32/f_ce49a186b29b3b264440ffa2e49d64797b95db975d7d89c328a54bf5a43f5c86/JA0004-PPSA01652_00-YOUTUBESIEJA0000_sc.pkg",
           "filename": "JA0004-PPSA01652_00-YOUTUBESIEJA0000_sc.pkg",
           "size": 25690112,
           "sha256": "abbb531a1d0117314ae8284be4be670b1d054983de53aebdfbab2b55e840bb40",
-          "package_digest": "D4BE8EA7B1A585929FF75EFE67BFC8CFA8D9E1B9E060BE25DF4E4745F919C1E4"
+          "package_digest": "D4BE8EA7B1A585929FF75EFE67BFC8CFA8D9E1B9E060BE25DF4E4745F919C1E4",
+          "title_id": "PPSA01652"
         }
       }
     }

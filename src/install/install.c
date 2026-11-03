@@ -18,8 +18,9 @@
 #define TIMEOUT_SECONDS (30 * 60)
 
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
-static install_status_t g_status = {INSTALL_IDLE, ""};
+static install_status_t g_status = {INSTALL_IDLE, "", ""};
 static char g_pkg[512];
+static char g_title_id[TITLE_ID_CAP];
 static char g_uri[96];
 static time_t g_started;
 static long long g_pkg_size;
@@ -53,7 +54,7 @@ static void end_job(install_state_t state, const char *text) {
 
 static int installed_since_start(void) {
   installed_info_t now;
-  installed_read(&now);
+  installed_read(g_title_id, &now);
   if (!now.installed || now.pkg_size != g_pkg_size) {
     return 0;
   }
@@ -87,7 +88,7 @@ static void *worker(void *arg) {
   meta.icon_url = "";
 
   installed_info_t before;
-  installed_read(&before);
+  installed_read(g_title_id, &before);
   g_had_pkg = before.installed;
   g_pkg_size_before = before.pkg_size;
   snprintf(g_json_before, sizeof g_json_before, "%s", before.app_json_sha256);
@@ -128,16 +129,22 @@ static void *worker(void *arg) {
   return NULL;
 }
 
-int install_start(const char *pkg_path, const char *expected_digest, int delete_when_done) {
+int install_start(const char *title_id, const char *pkg_path, const char *expected_digest,
+                  int delete_when_done) {
+  if (title_index(title_id) < 0 || !pkg_path) {
+    return -1;
+  }
   pthread_mutex_lock(&g_lock);
   if (g_status.state == INSTALL_RUNNING) {
     pthread_mutex_unlock(&g_lock);
     return -1;
   }
+  snprintf(g_title_id, sizeof g_title_id, "%s", title_id);
   snprintf(g_pkg, sizeof g_pkg, "%s", pkg_path);
   snprintf(g_expected_digest, sizeof g_expected_digest, "%s", expected_digest ? expected_digest : "");
   g_delete = delete_when_done;
   g_status.state = INSTALL_RUNNING;
+  snprintf(g_status.title_id, sizeof g_status.title_id, "%s", title_id);
   snprintf(g_status.message, sizeof g_status.message, "%s", "Starting the installer");
   pthread_mutex_unlock(&g_lock);
 

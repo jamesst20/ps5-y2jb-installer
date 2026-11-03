@@ -5,9 +5,7 @@
 #include <stddef.h>
 
 #include "paths.h"
-
-#define DOWNLOAD0_DEST "/user/download/PPSA01650/download0.dat"
-#define DOWNLOAD0_PARTIAL DOWNLOAD0_DEST ".partial"
+#include "titles.h"
 
 typedef enum {
   DOWNLOAD0_VERSION_UNKNOWN = 0,
@@ -15,21 +13,26 @@ typedef enum {
   DOWNLOAD0_VERSION_READY,
 } download0_version_state_t;
 
-/* Starts a background scan for the image's embedded `autoloader_version = "<tag>"` marker.
+/* Starts a background scan, one title at a time, for each image's embedded version marker:
+ * `autoloader_version = "<tag>"` (itsPLK) or `version_string = "<text>"` (Gezine base).
  * A whole-file hash is unstable because YouTube writes into the mounted image. */
 void download0_start_refresh(void);
 
-/* Scans path synchronously. Returns 0 when a version was found, 1 when the marker is
- * absent, and -1 when the file cannot be read. */
-int download0_scan_version_at(const char *path);
+/* Scans path synchronously and stores the result for title_id. Returns 0 when a version
+ * was found, 1 when the marker is absent, and -1 when the title is unknown or the file
+ * cannot be read. */
+int download0_scan_version_at(const char *title_id, const char *path);
 
-/* Copies the release string, or "" when unknown. */
-void download0_version(char *out, size_t cap);
+/* Copies the title's release string, or "" when unknown. */
+void download0_version(const char *title_id, char *out, size_t cap);
 
 /* Returns "unknown", "computing" or "ready". */
-const char *download0_version_state_name(void);
+const char *download0_version_state_name(const char *title_id);
 
-/* Removes download0.dat and its partial file. A missing file counts as success. */
-int download0_remove(void);
+/* True when the title has a download0.dat. */
+int download0_present(const char *title_id);
+
+/* Removes the title's download0.dat and its partial file. A missing file counts as success. */
+int download0_remove(const char *title_id);
 
 #endif

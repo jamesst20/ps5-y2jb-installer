@@ -18,6 +18,7 @@ pub struct ScFile {
     pub size: u64,
     pub sha256: String,
     pub package_digest: String,
+    pub title_id: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -61,9 +62,18 @@ pub fn all() -> &'static Manifest {
     manifest()
 }
 
+/// True when any pinned build ships this title ID.
+pub fn has_title(title_id: &str) -> bool {
+    manifest()
+        .builds
+        .iter()
+        .any(|build| build.sc.values().any(|sc| sc.title_id == title_id))
+}
+
 #[derive(Serialize)]
 pub struct RegionSummary {
     pub region: String,
+    pub title_id: String,
     pub filename: String,
     pub size: u64,
     pub package_digest: String,
@@ -98,6 +108,7 @@ pub fn manifest_view() -> ManifestView {
                     .iter()
                     .map(|(region, sc)| RegionSummary {
                         region: region.clone(),
+                        title_id: sc.title_id.clone(),
                         filename: sc.filename.clone(),
                         size: sc.size,
                         package_digest: sc.package_digest.clone(),
@@ -245,5 +256,34 @@ mod tests {
                 assert!(sc.size > 0);
             }
         }
+    }
+
+    #[test]
+    fn every_region_has_a_unique_title_id() {
+        let expected = [
+            ("usa", "PPSA01650"),
+            ("europe", "PPSA01651"),
+            ("japan", "PPSA01652"),
+        ];
+        for build in &manifest().builds {
+            let mut titles = std::collections::BTreeSet::new();
+            for (region, title_id) in expected {
+                let sc = build.sc.get(region).expect("region");
+                assert_eq!(
+                    sc.title_id, title_id,
+                    "{} {region} has the wrong title",
+                    build.build
+                );
+                assert!(
+                    titles.insert(sc.title_id.clone()),
+                    "{} {region} reuses title {}",
+                    build.build,
+                    sc.title_id
+                );
+            }
+            assert_eq!(titles.len(), 3);
+        }
+        assert!(has_title("PPSA01652"));
+        assert!(!has_title("PPSA00000"));
     }
 }

@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 #define MARKER "autoloader_version"
-#define MARKER_LEN (sizeof MARKER - 1)
+#define VERSION_STRING_MARKER "version_string"
 
 #define MARKER_WINDOW 128
 #define READ_SIZE (1024 * 1024)
@@ -20,18 +20,22 @@
 
 #define LEGACY_DIGEST WORK_DIR "/download0.sha256"
 
-static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
-static char g_version[64];
-static download0_version_state_t g_state = DOWNLOAD0_VERSION_UNKNOWN;
+typedef struct {
+  char version[64];
+  download0_version_state_t state;
+  unsigned generation;
+} download0_entry_t;
 
-static unsigned g_generation;
+static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
+static download0_entry_t g_entries[TITLE_COUNT];
+static unsigned g_epoch;
 
 static int valid_version(const char *value) {
   if (!value) {
     return 0;
   }
   size_t length = strlen(value);
-  if (length < 2 || length >= sizeof g_version) {
+  if (length < 2 || length >= sizeof g_entries[0].version) {
     return 0;
   }
   if (value[0] != 'v' && !(value[0] >= '0' && value[0] <= '9')) {
@@ -47,30 +51,55 @@ static int valid_version(const char *value) {
   return 1;
 }
 
-static void store_version(const char *value) {
-  pthread_mutex_lock(&g_lock);
-  if (valid_version(value)) {
-    snprintf(g_version, sizeof g_version, "%s", value);
-    g_state = DOWNLOAD0_VERSION_READY;
-  } else {
-    g_version[0] = '\0';
-    g_state = DOWNLOAD0_VERSION_UNKNOWN;
+/* Gezine/Y2JB is the upstream base. Images from it expose the release as
+ * `const version_string = "Y2JB 1.7 by Gezine";`, while the maintained itsPLK fork uses
+ * `autoloader_version`. Accept a printable, non-empty string from either marker. */
+static int valid_version_string(const char *value) {
+  if (!value) {
+    return 0;
   }
-  g_generation++;
-  pthread_mutex_unlock(&g_lock);
+  size_t length = strlen(value);
+  if (length < 2 || length >= sizeof g_entries[0].version) {
+    return 0;
+  }
+  int has_alnum = 0;
+  for (size_t i = 0; i < length; i++) {
+    unsigned char c = (unsigned char)value[i];
+    if (c < 0x20 || c > 0x7e || c == '"') {
+      return 0;
+    }
+    if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+      has_alnum = 1;
+    }
+  }
+  return has_alnum;
 }
 
-static int find_version(const unsigned char *buffer, size_t length, char *out, size_t cap) {
+/* Sets one title's state. The caller holds g_lock. */
+static void set_entry_locked(int index, const char *value, download0_version_state_t state) {
+  if (value && (valid_version(value) || valid_version_string(value))) {
+    snprintf(g_entries[index].version, sizeof g_entries[index].version, "%s", value);
+    g_entries[index].state = DOWNLOAD0_VERSION_READY;
+  } else {
+    g_entries[index].version[0] = '\0';
+    g_entries[index].state = state;
+  }
+  g_entries[index].generation++;
+}
+
+static int find_marker_value(const unsigned char *buffer, size_t length, const char *marker,
+                             char *out, size_t cap, int strict) {
+  size_t marker_len = strlen(marker);
   const unsigned char *p = buffer;
   const unsigned char *end = buffer + length;
 
   while (p < end) {
-    const unsigned char *hit = memchr(p, MARKER[0], (size_t)(end - p));
+    const unsigned char *hit = memchr(p, marker[0], (size_t)(end - p));
     if (!hit) {
       return 0;
     }
-    if ((size_t)(end - hit) >= MARKER_LEN && memcmp(hit, MARKER, MARKER_LEN) == 0) {
-      const unsigned char *q = hit + MARKER_LEN;
+    if ((size_t)(end - hit) >= marker_len && memcmp(hit, marker, marker_len) == 0) {
+      const unsigned char *q = hit + marker_len;
       const unsigned char *limit = q + MARKER_WINDOW < end ? q + MARKER_WINDOW : end;
       while (q < limit && (*q == ' ' || *q == '\t' || *q == '\r' || *q == '\n')) {
         q++;
@@ -90,7 +119,7 @@ static int find_version(const unsigned char *buffer, size_t length, char *out, s
             size_t value_len = (size_t)(q - value);
             memcpy(out, value, value_len);
             out[value_len] = '\0';
-            if (valid_version(out)) {
+            if (strict ? valid_version(out) : valid_version_string(out)) {
               return 1;
             }
           }
@@ -100,6 +129,11 @@ static int find_version(const unsigned char *buffer, size_t length, char *out, s
     p = hit + 1;
   }
   return 0;
+}
+
+static int find_version(const unsigned char *buffer, size_t length, char *out, size_t cap) {
+  return find_marker_value(buffer, length, MARKER, out, cap, 1) ||
+         find_marker_value(buffer, length, VERSION_STRING_MARKER, out, cap, 0);
 }
 
 static int scan_version(const char *path, char *out, size_t cap) {
@@ -142,27 +176,39 @@ static int scan_version(const char *path, char *out, size_t cap) {
 }
 
 static void *refresh_thread(void *arg) {
-  unsigned generation = (unsigned)(uintptr_t)arg;
-  char version[64] = "";
-  int result = scan_version(DOWNLOAD0_DEST, version, sizeof version);
+  unsigned epoch = (unsigned)(uintptr_t)arg;
 
-  pthread_mutex_lock(&g_lock);
-  if (g_generation == generation) {
-    if (result == 0 && valid_version(version)) {
-      snprintf(g_version, sizeof g_version, "%s", version);
-      g_state = DOWNLOAD0_VERSION_READY;
-    } else {
-      g_version[0] = '\0';
-      g_state = DOWNLOAD0_VERSION_UNKNOWN;
+  for (int i = 0; i < TITLE_COUNT; i++) {
+    char path[256];
+    if (title_download0_path(TITLES[i].title_id, path, sizeof path) != 0) {
+      continue;
     }
-    g_generation++;
-  }
-  pthread_mutex_unlock(&g_lock);
 
-  if (result < 0) {
-    fprintf(stderr, "download0: could not read the image to find its version\n");
-  } else if (result > 0) {
-    fprintf(stderr, "download0: no autoloader_version marker in the image\n");
+    pthread_mutex_lock(&g_lock);
+    int present = epoch == g_epoch &&
+                  g_entries[i].state == DOWNLOAD0_VERSION_COMPUTING;
+    unsigned generation = g_entries[i].generation;
+    pthread_mutex_unlock(&g_lock);
+    if (!present) {
+      continue;
+    }
+
+    char version[64] = "";
+    int result = scan_version(path, version, sizeof version);
+
+    pthread_mutex_lock(&g_lock);
+    if (epoch == g_epoch && g_entries[i].generation == generation) {
+      set_entry_locked(i, result == 0 ? version : NULL, DOWNLOAD0_VERSION_UNKNOWN);
+    }
+    pthread_mutex_unlock(&g_lock);
+
+    if (result < 0) {
+      fprintf(stderr, "download0: %s: could not read the image to find its version\n",
+              TITLES[i].title_id);
+    } else if (result > 0) {
+      fprintf(stderr, "download0: %s: no Y2JB version marker in the image\n",
+              TITLES[i].title_id);
+    }
   }
   return NULL;
 }
@@ -171,50 +217,70 @@ void download0_start_refresh(void) {
   remove(LEGACY_DIGEST);
   remove(LEGACY_DIGEST ".partial");
 
-  struct stat st;
-  if (stat(DOWNLOAD0_DEST, &st) != 0 || st.st_size <= 0) {
-    store_version(NULL);
-    return;
-  }
-
   pthread_mutex_lock(&g_lock);
-  g_state = DOWNLOAD0_VERSION_COMPUTING;
-  unsigned generation = ++g_generation;
+  unsigned epoch = ++g_epoch;
+  for (int i = 0; i < TITLE_COUNT; i++) {
+    char path[256];
+    struct stat st;
+    if (title_download0_path(TITLES[i].title_id, path, sizeof path) == 0 &&
+        stat(path, &st) == 0 && st.st_size > 0) {
+      g_entries[i].version[0] = '\0';
+      g_entries[i].state = DOWNLOAD0_VERSION_COMPUTING;
+      g_entries[i].generation++;
+      fprintf(stderr, "download0: scanning %s (%lld bytes) for its version\n",
+              TITLES[i].title_id, (long long)st.st_size);
+    } else {
+      set_entry_locked(i, NULL, DOWNLOAD0_VERSION_UNKNOWN);
+    }
+  }
   pthread_mutex_unlock(&g_lock);
 
-  fprintf(stderr, "download0: scanning %lld bytes for its version\n", (long long)st.st_size);
   pthread_t thread;
-  if (pthread_create(&thread, NULL, refresh_thread, (void *)(uintptr_t)generation) != 0) {
+  if (pthread_create(&thread, NULL, refresh_thread, (void *)(uintptr_t)epoch) != 0) {
     fprintf(stderr, "download0: could not start the version scan thread\n");
-    store_version(NULL);
+    pthread_mutex_lock(&g_lock);
+    for (int i = 0; i < TITLE_COUNT; i++) {
+      if (g_entries[i].state == DOWNLOAD0_VERSION_COMPUTING) {
+        set_entry_locked(i, NULL, DOWNLOAD0_VERSION_UNKNOWN);
+      }
+    }
+    pthread_mutex_unlock(&g_lock);
     return;
   }
   pthread_detach(thread);
 }
 
-int download0_scan_version_at(const char *path) {
+int download0_scan_version_at(const char *title_id, const char *path) {
+  int index = title_index(title_id);
+  if (index < 0) {
+    return -1;
+  }
   char version[64] = "";
   int result = scan_version(path, version, sizeof version);
-  if (result == 0 && valid_version(version)) {
-    store_version(version);
-  } else {
-    store_version(NULL);
-  }
+  pthread_mutex_lock(&g_lock);
+  set_entry_locked(index, result == 0 ? version : NULL, DOWNLOAD0_VERSION_UNKNOWN);
+  pthread_mutex_unlock(&g_lock);
   return result;
 }
 
-void download0_version(char *out, size_t cap) {
-  pthread_mutex_lock(&g_lock);
-  if (cap > 0) {
-    snprintf(out, cap, "%s", g_version);
+void download0_version(const char *title_id, char *out, size_t cap) {
+  int index = title_index(title_id);
+  if (cap == 0) {
+    return;
   }
+  pthread_mutex_lock(&g_lock);
+  snprintf(out, cap, "%s", index >= 0 ? g_entries[index].version : "");
   pthread_mutex_unlock(&g_lock);
 }
 
-const char *download0_version_state_name(void) {
-  const char *name;
+const char *download0_version_state_name(const char *title_id) {
+  const char *name = "unknown";
+  int index = title_index(title_id);
+  if (index < 0) {
+    return name;
+  }
   pthread_mutex_lock(&g_lock);
-  switch (g_state) {
+  switch (g_entries[index].state) {
     case DOWNLOAD0_VERSION_COMPUTING: name = "computing"; break;
     case DOWNLOAD0_VERSION_READY: name = "ready"; break;
     default: name = "unknown"; break;
@@ -223,13 +289,25 @@ const char *download0_version_state_name(void) {
   return name;
 }
 
-int download0_remove(void) {
-  if (remove(DOWNLOAD0_DEST) != 0 && errno != ENOENT) {
+int download0_present(const char *title_id) {
+  char path[256];
+  struct stat st;
+  return title_download0_path(title_id, path, sizeof path) == 0 && stat(path, &st) == 0;
+}
+
+int download0_remove(const char *title_id) {
+  int index = title_index(title_id);
+  char path[256], partial[256];
+  if (index < 0 || title_download0_path(title_id, path, sizeof path) != 0 ||
+      title_download0_partial(title_id, partial, sizeof partial) != 0) {
     return -1;
   }
-  remove(DOWNLOAD0_PARTIAL);
-  remove(LEGACY_DIGEST);
-  remove(LEGACY_DIGEST ".partial");
-  store_version(NULL);
+  if (remove(path) != 0 && errno != ENOENT) {
+    return -1;
+  }
+  remove(partial);
+  pthread_mutex_lock(&g_lock);
+  set_entry_locked(index, NULL, DOWNLOAD0_VERSION_UNKNOWN);
+  pthread_mutex_unlock(&g_lock);
   return 0;
 }

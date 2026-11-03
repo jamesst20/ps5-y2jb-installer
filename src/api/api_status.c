@@ -16,6 +16,7 @@
 #include "device/netcheck.h"
 #include "device/sysinfo.h"
 #include "device/upload.h"
+#include "titles.h"
 #include "version.h"
 
 static long long file_size(const char *path) {
@@ -39,16 +40,57 @@ static const char *updates_name(appdb_updates_t updates) {
   }
 }
 
-static cJSON *youtube_json(void) {
+static cJSON *youtube_region_json(const title_entry_t *title) {
   installed_info_t info;
-  installed_read(&info);
+  installed_read(title->title_id, &info);
   cJSON *o = cJSON_CreateObject();
+  cJSON_AddStringToObject(o, "region", title->region);
+  cJSON_AddStringToObject(o, "title_id", title->title_id);
   cJSON_AddBoolToObject(o, "installed", info.installed);
   cJSON_AddNumberToObject(o, "pkg_size", (double)info.pkg_size);
   cJSON_AddStringToObject(o, "package_digest", info.package_digest);
   cJSON_AddStringToObject(o, "version", info.version);
-  cJSON_AddStringToObject(o, "updates", updates_name(appdb_youtube_updates()));
+  cJSON_AddStringToObject(o, "updates", updates_name(appdb_youtube_updates(title->title_id)));
   return o;
+}
+
+static cJSON *youtube_json(void) {
+  cJSON *o = cJSON_CreateObject();
+  cJSON *regions = cJSON_AddArrayToObject(o, "regions");
+  for (int i = 0; i < TITLE_COUNT; i++) {
+    cJSON_AddItemToArray(regions, youtube_region_json(&TITLES[i]));
+  }
+  return o;
+}
+
+static cJSON *download0_entry_json(const title_entry_t *title) {
+  char path[256] = "";
+  title_download0_path(title->title_id, path, sizeof path);
+  int present = download0_present(title->title_id);
+  cJSON *o = cJSON_CreateObject();
+  cJSON_AddStringToObject(o, "region", title->region);
+  cJSON_AddStringToObject(o, "title_id", title->title_id);
+  cJSON_AddBoolToObject(o, "present", present);
+  cJSON_AddStringToObject(o, "path", path);
+  cJSON_AddNumberToObject(o, "size", (double)(present ? file_size(path) : -1));
+  char version[64] = "";
+  const char *version_state = "unknown";
+  if (present) {
+    download0_version(title->title_id, version, sizeof version);
+    version_state = download0_version_state_name(title->title_id);
+  }
+  cJSON_AddStringToObject(o, "version", version);
+  cJSON_AddStringToObject(o, "version_state", version_state);
+  cJSON_AddBoolToObject(o, "y2jb", present && strcmp(version_state, "ready") == 0);
+  return o;
+}
+
+static cJSON *download0_json(void) {
+  cJSON *array = cJSON_CreateArray();
+  for (int i = 0; i < TITLE_COUNT; i++) {
+    cJSON_AddItemToArray(array, download0_entry_json(&TITLES[i]));
+  }
+  return array;
 }
 
 static const char *upload_state_name(upload_state_t state) {
@@ -79,12 +121,14 @@ static cJSON *jobs_json(void) {
   cJSON *u = cJSON_AddObjectToObject(o, "upload");
   cJSON_AddStringToObject(u, "state", upload_state_name(up.state));
   cJSON_AddStringToObject(u, "slot", up.slot);
+  cJSON_AddStringToObject(u, "title_id", up.title_id);
   cJSON_AddNumberToObject(u, "bytes", (double)up.bytes);
   cJSON_AddNumberToObject(u, "total", (double)up.total);
   cJSON_AddStringToObject(u, "message", up.message);
 
   cJSON *i = cJSON_AddObjectToObject(o, "install");
   cJSON_AddStringToObject(i, "state", install_state_name(in.state));
+  cJSON_AddStringToObject(i, "title_id", in.title_id);
   cJSON_AddStringToObject(i, "message", in.message);
   return o;
 }
@@ -119,18 +163,7 @@ http_reply_t api_status(void) {
 
   cJSON *files = cJSON_AddObjectToObject(root, "files");
   cJSON_AddItemToObject(files, "merged", file_json(upload_merged_path()));
-  int placed_present = file_size(DOWNLOAD0_DEST) >= 0;
-  cJSON *placed = file_json(DOWNLOAD0_DEST);
-  cJSON_AddStringToObject(placed, "path", DOWNLOAD0_DEST);
-  char version[64] = "";
-  const char *version_state = "unknown";
-  if (placed_present) {
-    download0_version(version, sizeof version);
-    version_state = download0_version_state_name();
-  }
-  cJSON_AddStringToObject(placed, "version", version);
-  cJSON_AddStringToObject(placed, "version_state", version_state);
-  cJSON_AddItemToObject(files, "download0", placed);
+  cJSON_AddItemToObject(files, "download0", download0_json());
   cJSON_AddItemToObject(files, "fakesignin", file_json(upload_fakesignin_path()));
 
   cJSON_AddItemToObject(root, "youtube", youtube_json());

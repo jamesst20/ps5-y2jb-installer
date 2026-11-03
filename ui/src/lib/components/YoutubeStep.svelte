@@ -1,16 +1,29 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <script>
   import { Button } from '$lib/components/ui/button/index.js';
-  import { Label } from '$lib/components/ui/label/index.js';
+  import { Badge } from '$lib/components/ui/badge/index.js';
   import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
-  import {
-    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-  } from '$lib/components/ui/select/index.js';
   import { strings as t } from '$lib/strings.js';
   import Step from '$lib/components/Step.svelte';
   import Notice from '$lib/components/Notice.svelte';
+  import RegionTabs from '$lib/components/RegionTabs.svelte';
 
   let { installer } = $props();
+
+  let selectedRegion = $state('');
+
+  const tabs = $derived(
+    installer.youtubeRows.map((row) => ({
+      value: row.region,
+      label: t.youtube.regions[row.region] ?? row.region,
+      done: row.status?.installed === true,
+    })),
+  );
+  const row = $derived(
+    installer.youtubeRows.find((entry) => entry.region === selectedRegion) ??
+      installer.youtubeRows[0] ??
+      null,
+  );
 </script>
 
 <Step
@@ -26,83 +39,86 @@
   onOpen={() => installer.selectStep('youtube')}
 >
   <div class="flex flex-col gap-3">
-    <div class="grid gap-3 sm:grid-cols-2">
-      <div class="flex flex-col gap-1">
-        <span class="text-xs text-muted-foreground">{t.youtube.installed}</span>
-        <span class="text-sm font-medium">
-          {#if installer.installed?.installed}
-            {installer.youtubeSummary}
-          {:else}
-            {t.common.notInstalled}
-          {/if}
-        </span>
-      </div>
-      <div class="flex flex-col gap-1.5">
-        <Label for="region">{t.youtube.region}</Label>
-        <Select type="single" bind:value={installer.region} items={installer.regionItems}>
-          <SelectTrigger id="region" class="w-full">
-            <SelectValue placeholder={t.youtube.region} />
-          </SelectTrigger>
-          <SelectContent>
-            {#each installer.regions as entry (entry.region)}
-              <SelectItem value={entry.region} label={t.youtube.regions[entry.region] ?? entry.region}>
-                {t.youtube.regions[entry.region] ?? entry.region}
-              </SelectItem>
-            {/each}
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
-
     {#if !installer.build}
       <Alert class="border-warning/40 bg-warning/10">
         <AlertDescription class="text-warning">{t.youtube.unsupportedFirmware}</AlertDescription>
       </Alert>
     {/if}
 
-    <div class="flex flex-wrap gap-2">
-      <Button
-        disabled={!installer.desktop || !installer.build || installer.busy !== ''}
-        loading={installer.busy === 'fetch'}
-        onclick={installer.fetchAndJoin}
-      >
-        {t.youtube.fetchJoin}
-      </Button>
-      <Button
-        variant={installer.alreadyInstalled ? 'outline' : 'default'}
-        disabled={!installer.targetIp || !installer.build || installer.busy !== '' || !installer.cachedPkg?.merged || installer.jobRunning}
-        loading={installer.busy === 'upload'}
-        onclick={installer.uploadAndInstall}
-      >
-        {installer.alreadyInstalled ? t.youtube.reinstall : t.youtube.install}
-      </Button>
-    </div>
+    {#if tabs.length > 0}
+      <RegionTabs
+        value={row?.region ?? ''}
+        items={tabs}
+        label={t.youtube.region}
+        onValueChange={(region) => (selectedRegion = region)}
+      />
+    {/if}
 
-    <div class="flex flex-col gap-0.5">
-      <p class="text-xs {installer.cachedPkg?.merged ? 'text-success' : 'text-destructive'}">
-        {installer.cachedPkg?.merged ? t.youtube.cached : t.common.notCached}
-      </p>
-      {#if installer.cachedPkg?.path}
-        <p
-          class="break-all font-mono text-[11px] {installer.cachedPkg.merged
-            ? 'text-success/80'
-            : 'text-muted-foreground'}"
-        >
-          {installer.cachedPkg.path}
-        </p>
-      {/if}
-    </div>
+    {#if row}
+      <div class="flex flex-col gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" class="font-mono">{row.title_id}</Badge>
+          {#if row.status?.installed}
+            <Badge class="border-success/30 bg-success/10 text-success">
+              {row.status.version || t.youtube.installed}
+            </Badge>
+          {:else}
+            <Badge variant="outline">{t.common.notInstalled}</Badge>
+          {/if}
+        </div>
 
-    {#if installer.installJob && installer.installJob.state !== 'idle'}
-      <p
-        class="text-sm {installer.installJob.state === 'error'
-          ? 'text-destructive'
-          : installer.installJob.state === 'done'
-            ? 'text-success'
-            : 'text-muted-foreground'}"
-      >
-        {installer.installJob.message}
-      </p>
+        <div class="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!installer.desktop || !installer.build || installer.busy !== ''}
+            loading={installer.busy === 'fetch' && installer.busyRegion === row.region}
+            onclick={() => installer.fetchAndJoin(row.region)}
+          >
+            {t.youtube.fetchJoin}
+          </Button>
+          <Button
+            size="sm"
+            variant={row.alreadyInstalled ? 'outline' : 'default'}
+            disabled={!installer.targetIp ||
+              !installer.build ||
+              installer.busy !== '' ||
+              !row.cached?.merged ||
+              installer.jobRunning}
+            loading={installer.busy === 'upload' && installer.busyRegion === row.region}
+            onclick={() => installer.uploadAndInstall(row.region)}
+          >
+            {row.alreadyInstalled ? t.youtube.reinstall : t.youtube.install}
+          </Button>
+        </div>
+
+        <div class="flex flex-col gap-0.5">
+          <p class="text-xs {row.cached?.merged ? 'text-success' : 'text-destructive'}">
+            {row.cached?.merged ? t.youtube.cached : t.common.notCached}
+          </p>
+          {#if row.cached?.path}
+            <p
+              class="break-all font-mono text-[11px] {row.cached.merged
+                ? 'text-success/80'
+                : 'text-muted-foreground'}"
+            >
+              {row.cached.path}
+            </p>
+          {/if}
+        </div>
+
+        {#if row.installJob}
+          <p
+            class="text-sm {row.installJob.state === 'error'
+              ? 'text-destructive'
+              : row.installJob.state === 'done'
+                ? 'text-success'
+                : 'text-muted-foreground'}"
+          >
+            {row.installJob.message}
+          </p>
+        {/if}
+      </div>
     {/if}
 
     <Notice notice={installer.notices.youtube} />

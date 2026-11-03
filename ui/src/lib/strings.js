@@ -106,6 +106,9 @@ export const strings = {
     onPs5: 'On the PS5',
     onPc: `Cached on this ${localDevice}`,
     unknownVersion: 'Version unknown',
+    notY2jb: 'Not Y2JB',
+    notY2jbHint:
+      'This file was created by YouTube, not Y2JB. Fetch and upload a Y2JB release for this region.',
     none: 'None',
     repository: 'Repository',
     defaultRepo: 'Official (itsPLK)',
@@ -114,6 +117,7 @@ export const strings = {
     release: 'Release',
     releaseTagLatest: 'latest',
     releaseTagPrerelease: 'pre-release',
+    regionMissingYouTube: 'Install this region in the YouTube step first.',
     refresh: 'Refresh',
     latest: 'Latest',
     prerelease: 'Pre-release',

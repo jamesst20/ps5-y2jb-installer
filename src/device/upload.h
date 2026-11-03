@@ -4,6 +4,8 @@
 
 #include <stddef.h>
 
+#include "titles.h"
+
 #define UPLOAD_SLOT_MERGED "merged"
 #define UPLOAD_SLOT_DOWNLOAD0 "download0"
 #define UPLOAD_SLOT_FAKESIGNIN "fakesignin"
@@ -18,15 +20,18 @@ typedef enum {
 typedef struct {
   upload_state_t state;
   char slot[16];
+  char title_id[TITLE_ID_CAP];
   long long bytes;
   long long total;
   char message[192];
 } upload_status_t;
 
-/* Starts a slot upload. length is Content-Length and sha256 is the expected lowercase hex
- * digest. Validates the slot, size limit and free space (at least 16 MiB must remain) before
- * accepting bytes. */
-int upload_begin(const char *slot, long long length, const char *sha256, char *why, size_t cap);
+/* Starts a slot upload. title_id is required for the download0 slot and ignored otherwise.
+ * length is Content-Length and sha256 is the expected lowercase hex digest. Validates the
+ * slot, title, size limit and free space (at least 16 MiB must remain) before accepting
+ * bytes. */
+int upload_begin(const char *slot, const char *title_id, long long length, const char *sha256,
+                 char *why, size_t cap);
 
 /* Writes or finishes the active upload. A failure removes the partial file. */
 int upload_write(const char *data, size_t len, char *why, size_t cap);

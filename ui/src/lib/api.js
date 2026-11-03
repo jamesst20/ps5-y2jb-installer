@@ -47,7 +47,14 @@ export const fakeSignin = (uid) => call('POST', 'fakesignin', { uid });
 export const reboot = () => call('POST', 'reboot');
 export const shutdownPayload = () => call('POST', 'shutdown');
 
-export const youtubeInstall = (packageDigest) =>
-  call('POST', 'youtube/install', packageDigest ? { package_digest: packageDigest } : undefined);
+export const youtubeInstall = (packageDigest, titleId) =>
+  call(
+    'POST',
+    'youtube/install',
+    packageDigest || titleId
+      ? { package_digest: packageDigest, title_id: titleId }
+      : undefined,
+  );
 export const blockYoutubeUpdates = () => call('POST', 'youtube/block-updates');
-export const removeDownload0 = () => call('POST', 'download0/remove');
+export const removeDownload0 = (titleId) =>
+  call('POST', 'download0/remove', { title_id: titleId });

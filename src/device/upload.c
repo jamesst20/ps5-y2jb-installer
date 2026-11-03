@@ -27,14 +27,16 @@ typedef struct {
 
 static const slot_t SLOTS[] = {
     {UPLOAD_SLOT_MERGED, MERGED_PATH, 512LL * 1024 * 1024},
-    {UPLOAD_SLOT_DOWNLOAD0, DOWNLOAD0_DEST, 1024LL * 1024 * 1024},
+    {UPLOAD_SLOT_DOWNLOAD0, NULL, 1024LL * 1024 * 1024},
     {UPLOAD_SLOT_FAKESIGNIN, FAKESIGNIN_PATH, 4LL * 1024 * 1024},
 };
 
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
-static upload_status_t g_status = {UPLOAD_IDLE, "", 0, 0, ""};
+static upload_status_t g_status = {UPLOAD_IDLE, "", "", 0, 0, ""};
 static int g_fd = -1;
 static const slot_t *g_slot;
+static slot_t g_selected;
+static char g_dest[512];
 static char g_partial[512];
 static char g_expected[65];
 static SHA256_CTX g_sha;
@@ -125,7 +127,8 @@ static void fail_locked(const char *why) {
   snprintf(g_status.message, sizeof g_status.message, "%s", why);
 }
 
-int upload_begin(const char *slot, long long length, const char *sha256, char *why, size_t cap) {
+int upload_begin(const char *slot, const char *title_id, long long length, const char *sha256,
+                 char *why, size_t cap) {
   const slot_t *found = find_slot(slot);
   if (!found) {
     snprintf(why, cap, "unknown slot");
@@ -148,6 +151,12 @@ int upload_begin(const char *slot, long long length, const char *sha256, char *w
     return -1;
   }
 
+  int is_download0 = strcmp(found->name, UPLOAD_SLOT_DOWNLOAD0) == 0;
+  if (is_download0 && title_index(title_id) < 0) {
+    snprintf(why, cap, "title_id must be one of the supported YouTube titles");
+    return -1;
+  }
+
   pthread_mutex_lock(&g_lock);
   if (g_status.state == UPLOAD_RUNNING) {
     pthread_mutex_unlock(&g_lock);
@@ -155,20 +164,30 @@ int upload_begin(const char *slot, long long length, const char *sha256, char *w
     return -1;
   }
 
+  g_selected = *found;
+  if (is_download0) {
+    if (title_download0_path(title_id, g_dest, sizeof g_dest) != 0) {
+      pthread_mutex_unlock(&g_lock);
+      snprintf(why, cap, "destination path is too long");
+      return -1;
+    }
+    g_selected.dest = g_dest;
+  }
+
   char dir[512];
-  if (make_dirs(dir_of(found->dest, dir, sizeof dir)) != 0) {
+  if (make_dirs(dir_of(g_selected.dest, dir, sizeof dir)) != 0) {
     pthread_mutex_unlock(&g_lock);
     snprintf(why, cap, "cannot create the destination directory");
     return -1;
   }
-  long long available = free_space(found->dest);
+  long long available = free_space(g_selected.dest);
   if (available >= 0 && available < length + FREE_SPACE_MARGIN) {
     pthread_mutex_unlock(&g_lock);
     snprintf(why, cap, "not enough free space: need %lld bytes, have %lld", length + FREE_SPACE_MARGIN,
              available);
     return -1;
   }
-  if (snprintf(g_partial, sizeof g_partial, "%s.partial", found->dest) >= (int)sizeof g_partial) {
+  if (snprintf(g_partial, sizeof g_partial, "%s.partial", g_selected.dest) >= (int)sizeof g_partial) {
     pthread_mutex_unlock(&g_lock);
     snprintf(why, cap, "destination path is too long");
     return -1;
@@ -181,10 +200,11 @@ int upload_begin(const char *slot, long long length, const char *sha256, char *w
   }
 
   g_fd = fd;
-  g_slot = found;
+  g_slot = &g_selected;
   sha256_init(&g_sha);
   snprintf(g_expected, sizeof g_expected, "%s", sha256);
   snprintf(g_status.slot, sizeof g_status.slot, "%s", found->name);
+  snprintf(g_status.title_id, sizeof g_status.title_id, "%s", is_download0 ? title_id : "");
   g_status.state = UPLOAD_RUNNING;
   g_status.bytes = 0;
   g_status.total = length;
@@ -302,7 +322,12 @@ void upload_cleanup(void) {
   unlink(MERGED_PATH ".partial");
   unlink(FAKESIGNIN_PATH);
   unlink(FAKESIGNIN_PATH ".partial");
-  unlink(DOWNLOAD0_PARTIAL);
+  for (int i = 0; i < TITLE_COUNT; i++) {
+    char partial[256];
+    if (title_download0_partial(TITLES[i].title_id, partial, sizeof partial) == 0) {
+      unlink(partial);
+    }
+  }
 }
 
 const char *upload_merged_path(void) {

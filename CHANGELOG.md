@@ -6,11 +6,13 @@
 
 - Debian packages (`.deb`) for Debian/Ubuntu on amd64 and arm64.
 - Option to select custom repositories for `download0.dat`.
+- YouTube setup is now per region (USA `PPSA01650`, Europe `PPSA01651`, Japan `PPSA01652`), with independent install state, `download0.dat` release selection, upload, and removal for each region.
 
 ### Fixed
 
 - Fake sign-in upload failures now report the payload's actual reason instead of a blank `fakesignin:` message.
 - Connection and scan messages now distinguish an unreachable console from a reachable console with elfldr stopped, and explain the ports involved: elfldr on 9021 and the installer payload on 47291.
+- A `download0.dat` created by YouTube is no longer treated as a Y2JB setup; a region is only marked ready when the image contains an `autoloader_version` or `version_string` marker.
 
 ## 1.2.0 — 2026-11-03
 

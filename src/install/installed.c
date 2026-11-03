@@ -41,19 +41,25 @@ static const char *find_version(const cJSON *node) {
   return NULL;
 }
 
-void installed_read(installed_info_t *out) {
+void installed_read(const char *title_id, installed_info_t *out) {
   memset(out, 0, sizeof *out);
-  out->pkg_size = size_of(TITLE_APP_PKG);
+  out->pkg_size = -1;
+  char pkg[256], json[256];
+  if (title_app_pkg(title_id, pkg, sizeof pkg) != 0 ||
+      title_app_json(title_id, json, sizeof json) != 0) {
+    return;
+  }
+  out->pkg_size = size_of(pkg);
   out->installed = out->pkg_size >= 0;
   if (!out->installed) {
     return;
   }
-  if (size_of(TITLE_APP_JSON) < 0) {
+  if (size_of(json) < 0) {
     return;
   }
-  compute_sha256_file(TITLE_APP_JSON, out->app_json_sha256);
+  compute_sha256_file(json, out->app_json_sha256);
 
-  FILE *f = fopen(TITLE_APP_JSON, "rb");
+  FILE *f = fopen(json, "rb");
   if (!f) {
     return;
   }

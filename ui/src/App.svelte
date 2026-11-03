@@ -41,7 +41,7 @@
 
   <ConnectionCard {installer} />
 
-  {#if installer.internetOnline && installer.status?.files?.download0?.present}
+  {#if installer.internetOnline && installer.readyRegions.length > 0}
     <Alert class="sticky top-2 z-20 border-warning/40 shadow-md">
       <AlertDescription class="text-warning">{t.y2jb.internetDetected}</AlertDescription>
     </Alert>

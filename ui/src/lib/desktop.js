@@ -29,13 +29,13 @@ export const expectedBuild = (firmware) => call('expected_build', { firmware });
 export const fetchYoutube = (build, region) => call('fetch_youtube', { build, region });
 export const fetchDownload0 = (repo, tag) => call("fetch_download0", { repo, tag });
 export const download0Releases = (repo) => call("download0_releases", { repo });
-export const setDownload0Repo = (repo, allRepos) => call("set_download0_repo", { repo, all_repos: allRepos });
+export const setDownload0Repo = (repo, allRepos) => call("set_download0_repo", { repo, allRepos });
 export const fetchFakesignin = () => call('fetch_fakesignin');
 export const cacheStatus = () => call('cache_status');
 export const clearCache = () => call('clear_cache');
 export const clearDownload0Cache = () => call('clear_download0_cache');
 export const uploadMerged = (ip, build, region) => call('upload_merged', { ip, build, region });
-export const uploadDownload0 = (ip) => call('upload_download0', { ip });
+export const uploadDownload0 = (ip, titleId) => call('upload_download0', { ip, titleId });
 export const uploadFakesignin = (ip) => call('upload_fakesignin', { ip });
 export const cancelTransfer = () => call('cancel_transfer');
 
