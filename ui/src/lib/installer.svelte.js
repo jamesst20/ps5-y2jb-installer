@@ -35,11 +35,14 @@ import {
   cancelTransfer,
   onTransferProgress,
   download0Releases,
+  setDownload0Repo,
   appVersion,
 } from './desktop.js';
 import { strings as t } from './strings.js';
 import { POLL_MS, STEP_ORDER } from './constants.js';
 import { releaseLabel as formatReleaseLabel } from './format.js';
+
+export const OFFICIAL_DOWNLOAD0_REPO = 'itsPLK/ps5-y2jb-autoloader';
 
 export class Installer {
   appVersion = $state('');
@@ -65,7 +68,10 @@ export class Installer {
   releases = $state([]);
   releasesLoading = $state(false);
   releasesError = $state(false);
+  releasesLoaded = $state(false);
   selectedTag = $state('');
+  customRepos = $state([]);
+  activeRepo = $state(OFFICIAL_DOWNLOAD0_REPO);
   transfer = $state(null);
   busy = $state('');
   rebootPending = $state(false);
@@ -244,6 +250,8 @@ export class Installer {
 
     try {
       const settings = await getSettings();
+      if (settings?.custom_download0_repos) this.customRepos = settings.custom_download0_repos;
+      if (settings?.active_download0_repo) this.activeRepo = settings.active_download0_repo;
       if (settings?.console_ip && !this.ip) {
         this.ip = settings.console_ip;
       }
@@ -325,7 +333,7 @@ export class Installer {
     this.releasesLoading = true;
     this.releasesError = false;
     try {
-      this.releases = await download0Releases();
+      this.releases = await download0Releases(this.activeRepo);
       if (
         !this.selectedTag ||
         !this.releases.some((release) => release.tag === this.selectedTag)
@@ -340,6 +348,7 @@ export class Installer {
       this.releasesError = true;
     } finally {
       this.releasesLoading = false;
+      this.releasesLoaded = true;
     }
   };
 
@@ -686,7 +695,7 @@ export class Installer {
     this.transfer = null;
     this.clearNotice('y2jb');
     try {
-      const result = await fetchDownload0(this.selectedTag);
+      const result = await fetchDownload0(this.activeRepo, this.selectedTag);
       // The fetch already verified this digest, so publish it immediately instead of
       // hashing the same 336 MB again through cacheStatus.
       this.cache = {
@@ -795,6 +804,21 @@ export class Installer {
     } catch {
       // Nothing to stop.
     }
+  };
+
+  setRepo = async (repoSlug) => {
+    const slug = repoSlug
+      .trim()
+      .replace(/^https?:\/\/github\.com\//, "")
+      .replace(/\/+$/, "");
+    if (!slug || !/^[\w.-]+\/[\w.-]+$/.test(slug)) return;
+    if (slug !== OFFICIAL_DOWNLOAD0_REPO && !this.customRepos.includes(slug)) {
+      this.customRepos = [...this.customRepos, slug];
+    }
+    this.activeRepo = slug;
+    this.selectedTag = '';
+    await setDownload0Repo(this.activeRepo, this.customRepos).catch(() => {});
+    await this.loadReleases();
   };
 
   disconnect = () => {

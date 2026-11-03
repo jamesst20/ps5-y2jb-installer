@@ -3,8 +3,7 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
-const RELEASES_URL: &str =
-    "https://api.github.com/repos/itsPLK/ps5-y2jb-autoloader/releases?per_page=30";
+pub const DEFAULT_DOWNLOAD0_REPO: &str = "itsPLK/ps5-y2jb-autoloader";
 
 #[derive(Deserialize)]
 struct GithubAsset {
@@ -33,14 +32,17 @@ pub struct ReleaseAsset {
     pub prerelease: bool,
 }
 
-pub async fn release_assets() -> Result<Vec<ReleaseAsset>, String> {
+pub async fn release_assets(repo: Option<&str>) -> Result<Vec<ReleaseAsset>, String> {
+    let repo_slug = repo.unwrap_or(DEFAULT_DOWNLOAD0_REPO).trim();
+    let url = format!("https://api.github.com/repos/{repo_slug}/releases?per_page=30");
+
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(20))
         .timeout(Duration::from_secs(120))
         .build()
         .map_err(|error| error.to_string())?;
     let releases: Vec<GithubRelease> = client
-        .get(RELEASES_URL)
+        .get(&url)
         .header(reqwest::header::USER_AGENT, crate::USER_AGENT)
         .send()
         .await
@@ -86,7 +88,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "needs GitHub"]
     async fn lists_verifiable_releases() {
-        let releases = release_assets().await.expect("release list failed");
+        let releases = release_assets(None).await.expect("release list failed");
         assert!(releases.len() >= 3);
         assert!(releases
             .iter()

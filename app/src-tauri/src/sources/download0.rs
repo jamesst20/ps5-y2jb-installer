@@ -20,10 +20,9 @@ pub struct Download0Release {
     pub prerelease: bool,
 }
 
-/// The releases that carry a verifiable download0.dat, newest first.
 #[tauri::command]
-pub async fn download0_releases() -> Result<Vec<Download0Release>, String> {
-    Ok(github::release_assets()
+pub async fn download0_releases(repo: Option<String>) -> Result<Vec<Download0Release>, String> {
+    Ok(github::release_assets(repo.as_deref())
         .await?
         .into_iter()
         .map(|asset| Download0Release {
@@ -45,17 +44,17 @@ fn choose(assets: Vec<ReleaseAsset>, tag: Option<&str>) -> Option<ReleaseAsset> 
 
 pub async fn fetch_into(
     root: &Path,
+    repo: Option<&str>,
     tag: Option<&str>,
     progress: &(dyn Fn(Progress) + Send + Sync),
     cancel: &AtomicBool,
 ) -> Result<FileResult, String> {
-    let chosen = choose(github::release_assets().await?, tag)
+    let chosen = choose(github::release_assets(repo).await?, tag)
         .ok_or("that release does not carry a verifiable download0.dat")?;
 
     let dir = paths::download0_dir(root);
     std::fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
     let destination = paths::download0_file(root);
-    // Older builds stored a tag beside the file. The digest is the authority now.
     let _ = std::fs::remove_file(dir.join("tag.txt"));
 
     transfer::download(
@@ -81,11 +80,15 @@ pub async fn fetch_into(
 }
 
 #[tauri::command]
-pub async fn fetch_download0(app: AppHandle, tag: Option<String>) -> Result<FileResult, String> {
+pub async fn fetch_download0(
+    app: AppHandle,
+    repo: Option<String>,
+    tag: Option<String>,
+) -> Result<FileResult, String> {
     let root = paths::data_dir(&app)?;
     let cancel = app.state::<Transfers>().start();
     let progress = transfer::emitter(&app);
-    fetch_into(&root, tag.as_deref(), &progress, &cancel).await
+    fetch_into(&root, repo.as_deref(), tag.as_deref(), &progress, &cancel).await
 }
 
 #[cfg(test)]
@@ -98,7 +101,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("y2jb-d0-latest-{}", std::process::id()));
         std::fs::remove_dir_all(&root).ok();
         let cancel = AtomicBool::new(false);
-        let result = fetch_into(&root, None, &|_| {}, &cancel)
+        let result = fetch_into(&root, None, None, &|_| {}, &cancel)
             .await
             .expect("download0 failed");
         assert_eq!(result.size, 336789504);
@@ -106,8 +109,6 @@ mod tests {
         std::fs::remove_dir_all(&root).ok();
     }
 
-    /// Regression: a new download0.dat release can have the same size as the cached one.
-    /// A size-only cache hit would upload the old file for the new tag.
     #[tokio::test]
     #[ignore = "downloads about 337 MB from GitHub"]
     async fn repairs_a_stale_same_size_cache() {
@@ -121,7 +122,7 @@ mod tests {
 
         let before = crate::digest::sha256_file(&destination).unwrap();
         let cancel = AtomicBool::new(false);
-        let result = fetch_into(&root, None, &|_| {}, &cancel)
+        let result = fetch_into(&root, None, None, &|_| {}, &cancel)
             .await
             .expect("download0 failed");
         let after = crate::digest::sha256_file(Path::new(&result.path)).unwrap();

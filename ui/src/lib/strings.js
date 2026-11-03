@@ -100,6 +100,10 @@ export const strings = {
     onPc: `Cached on this ${localDevice}`,
     unknownVersion: 'Version unknown',
     none: 'None',
+    repository: 'Repository',
+    defaultRepo: 'Official (itsPLK)',
+    repoPlaceholder: 'owner/repo',
+    repoNoMatch: 'No matching repository',
     release: 'Release',
     releaseTagLatest: 'latest',
     releaseTagPrerelease: 'pre-release',
@@ -119,6 +123,7 @@ export const strings = {
     cacheMismatch: (cached, selected) => `Cached ${cached}; fetch ${selected} before uploading.`,
     releaseReady: (label) => `${label} is ready.`,
     releaseListUnavailable: 'Could not read the release list from GitHub.',
+    releaseListEmpty: 'No download0.dat releases found in this repository.',
     done: 'download0.dat is in place.',
     internetDetected:
       'Internet access detected on the console. Disconnect it before opening YouTube; an online launch can overwrite download0.dat and require reinstalling it.',

@@ -11,8 +11,17 @@
   import { formatBytes } from '$lib/format.js';
   import Step from '$lib/components/Step.svelte';
   import Notice from '$lib/components/Notice.svelte';
+  import RepoCombobox from '$lib/components/RepoCombobox.svelte';
+  import { OFFICIAL_DOWNLOAD0_REPO } from '$lib/installer.svelte.js';
 
   let { installer } = $props();
+
+  const repoItems = $derived([
+    { value: OFFICIAL_DOWNLOAD0_REPO, label: t.y2jb.defaultRepo },
+    ...installer.customRepos
+      .filter((repo) => repo !== OFFICIAL_DOWNLOAD0_REPO)
+      .map((repo) => ({ value: repo, label: repo })),
+  ]);
 </script>
 
 <Step
@@ -89,32 +98,49 @@
     </div>
 
     <div class="flex flex-col gap-1.5">
-      <Label for="release">{t.y2jb.release}</Label>
-      <div class="flex flex-wrap gap-2">
-        <Select type="single" bind:value={installer.selectedTag} items={installer.releaseItems}>
-          <SelectTrigger id="release" class="w-full sm:w-64">
-            <SelectValue placeholder={t.y2jb.release} />
-          </SelectTrigger>
-          <SelectContent>
-            {#each installer.releases as release (release.tag)}
-              <SelectItem value={release.tag} label={installer.releaseLabel(release)}>
-                {installer.releaseLabel(release)}
-              </SelectItem>
-            {/each}
-          </SelectContent>
-        </Select>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={installer.releasesLoading}
-          loading={installer.releasesLoading}
-          onclick={installer.loadReleases}
-        >
-          {t.y2jb.refresh}
-        </Button>
+      <div class="flex flex-wrap items-start gap-3">
+        <div class="flex min-w-0 flex-col gap-1.5">
+          <Label for="repo-select">{t.y2jb.repository}</Label>
+          <RepoCombobox
+            id="repo-select"
+            class="sm:w-64"
+            bind:value={installer.activeRepo}
+            items={repoItems}
+            onCommit={installer.setRepo}
+          />
+        </div>
+
+        <div class="flex min-w-0 flex-col gap-1.5">
+          <Label for="release">{t.y2jb.release}</Label>
+          <div class="flex flex-wrap gap-2">
+            <Select type="single" bind:value={installer.selectedTag} items={installer.releaseItems}>
+              <SelectTrigger id="release" class="w-full sm:w-64">
+                <SelectValue placeholder={t.y2jb.release} />
+              </SelectTrigger>
+              <SelectContent>
+                {#each installer.releases as release (release.tag)}
+                  <SelectItem value={release.tag} label={installer.releaseLabel(release)}>
+                    {installer.releaseLabel(release)}
+                  </SelectItem>
+                {/each}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={installer.releasesLoading}
+              loading={installer.releasesLoading}
+              onclick={installer.loadReleases}
+            >
+              {t.y2jb.refresh}
+            </Button>
+          </div>
+        </div>
       </div>
       {#if installer.releasesError}
         <p class="text-xs text-destructive">{t.y2jb.releaseListUnavailable}</p>
+      {:else if installer.releasesLoaded && !installer.releasesLoading && installer.releases.length === 0}
+        <p class="text-xs text-destructive">{t.y2jb.releaseListEmpty}</p>
       {/if}
     </div>
 

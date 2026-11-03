@@ -27,8 +27,9 @@ export const waitForApi = (ip, timeoutMs) => call('wait_for_api', { ip, timeoutM
 export const manifestView = () => call('manifest_view');
 export const expectedBuild = (firmware) => call('expected_build', { firmware });
 export const fetchYoutube = (build, region) => call('fetch_youtube', { build, region });
-export const fetchDownload0 = (tag) => call('fetch_download0', { tag });
-export const download0Releases = () => call('download0_releases');
+export const fetchDownload0 = (repo, tag) => call("fetch_download0", { repo, tag });
+export const download0Releases = (repo) => call("download0_releases", { repo });
+export const setDownload0Repo = (repo, allRepos) => call("set_download0_repo", { repo, all_repos: allRepos });
 export const fetchFakesignin = () => call('fetch_fakesignin');
 export const cacheStatus = () => call('cache_status');
 export const clearCache = () => call('clear_cache');
