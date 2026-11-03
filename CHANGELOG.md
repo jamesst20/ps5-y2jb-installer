@@ -1,11 +1,16 @@
 # Changelog
 
-## 1.2.0 — 2026-11-03
+## Unreleased
 
 ### Added
 
 - Debian packages (`.deb`) for Debian/Ubuntu on amd64 and arm64.
 - Option to select custom repositories for `download0.dat`.
+
+## 1.2.0 — 2026-11-03
+
+### Added
+
 - Signed universal Android APK in release artifacts.
 - Android build documentation and signing instructions.
 
