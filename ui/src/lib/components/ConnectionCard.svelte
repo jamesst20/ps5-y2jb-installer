@@ -62,6 +62,9 @@
       {:else if installer.loaderVisible}
         <span class="text-warning">●</span>
         {t.connection.loaderFound}
+      {:else if installer.consoleUp}
+        <span class="text-warning">●</span>
+        {t.connection.consoleUpNoLoader(installer.targetIp)}
       {:else if installer.statusError && installer.targetIp}
         <span class="text-muted-foreground">●</span>
         {t.connection.nothingAnswered} <span class="font-mono">{installer.targetIp}</span>
@@ -70,6 +73,14 @@
         <span class="text-muted-foreground">{t.connection.notConnected}</span>
       {/if}
     </p>
+
+    {#if !installer.reachable && installer.targetIp && !installer.loaderVisible}
+      <Alert class="border-warning/40 bg-warning/10">
+        <AlertDescription class="text-warning">
+          {installer.consoleUp ? t.connection.loaderMissingHint : t.connection.consoleDownHint}
+        </AlertDescription>
+      </Alert>
+    {/if}
 
     {#if installer.found.length > 0}
       <div class="flex flex-col gap-1">

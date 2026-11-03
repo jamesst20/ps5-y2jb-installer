@@ -76,8 +76,11 @@ int fakesignin_run(char *msg, size_t msg_cap) {
   }
 
   if (send_to_loader(path) != 0) {
-    char text[160];
-    snprintf(text, sizeof text, "Could not send to the ELF loader on port %d (errno %d).", Y2JB_LOADER_PORT, errno);
+    char text[256];
+    snprintf(text, sizeof text,
+             "The ELF loader is not reachable on 127.0.0.1:%d. Start elfdr on the PS5 and keep it "
+             "running, then retry the fake sign-in (errno %d).",
+             Y2JB_LOADER_PORT, errno);
     set_msg(msg, msg_cap, text);
     return -1;
   }

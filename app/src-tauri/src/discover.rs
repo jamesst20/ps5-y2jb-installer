@@ -17,18 +17,27 @@ pub struct Found {
     pub ip: String,
     pub loader: bool,
     pub api: bool,
+    /// The host answered even if neither service is listening (for example, the
+    /// connection was refused). This distinguishes a powered-on console from an
+    /// unreachable IP.
+    pub alive: bool,
+}
+
+fn connect(ip: Ipv4Addr, port: u16) -> (bool, bool) {
+    match TcpStream::connect_timeout(&SocketAddr::new(IpAddr::V4(ip), port), PROBE_TIMEOUT) {
+        Ok(_) => (true, false),
+        Err(error) => (false, error.kind() == std::io::ErrorKind::ConnectionRefused),
+    }
 }
 
 fn probe_host(ip: Ipv4Addr) -> Found {
-    let loader =
-        TcpStream::connect_timeout(&SocketAddr::new(IpAddr::V4(ip), LOADER_PORT), PROBE_TIMEOUT)
-            .is_ok();
-    let api = TcpStream::connect_timeout(&SocketAddr::new(IpAddr::V4(ip), API_PORT), PROBE_TIMEOUT)
-        .is_ok();
+    let (loader, loader_refused) = connect(ip, LOADER_PORT);
+    let (api, api_refused) = connect(ip, API_PORT);
     Found {
         ip: ip.to_string(),
         loader,
         api,
+        alive: loader || api || loader_refused || api_refused,
     }
 }
 
@@ -123,11 +132,13 @@ pub async fn probe(ip: String) -> Found {
                 ip,
                 loader: false,
                 api: false,
+                alive: false,
             }),
         None => Found {
             ip,
             loader: false,
             api: false,
+            alive: false,
         },
     }
 }

@@ -92,6 +92,7 @@ export class Installer {
 
   reachable = $derived(this.status !== null);
   loaderVisible = $derived(!this.reachable && this.probed !== null && this.probed.loader);
+  consoleUp = $derived(!this.reachable && this.probed?.alive === true);
   payloadPercent = $derived(
     this.total > 0 ? Math.min(100, (this.sent / this.total) * 100) : 0,
   );
@@ -508,7 +509,7 @@ export class Installer {
       if (this.status) {
         this.focusNext();
       }
-      if (!this.status && !this.probed?.loader) {
+      if (!this.status && !this.probed?.loader && !this.probed?.alive) {
         this.notify('connect', t.connection.consoleUnreachable, false);
       }
     } finally {
@@ -522,7 +523,7 @@ export class Installer {
     try {
       this.found = await discover();
       if (this.found.length === 0) {
-        this.notify('connect', t.connection.consoleUnreachable, false);
+        this.notify('connect', t.connection.scanNothingFound, false);
       }
     } catch (error) {
       this.notify('connect', String(error), false);

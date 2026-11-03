@@ -35,8 +35,12 @@ fn send(app: &AppHandle, ip: &str) -> Result<u64, String> {
     let addr: SocketAddr = format!("{ip}:{LOADER_PORT}")
         .parse()
         .map_err(|e: std::net::AddrParseError| e.to_string())?;
-    let mut socket = TcpStream::connect_timeout(&addr, Duration::from_secs(5))
-        .map_err(|e| format!("cannot reach the loader on {addr}: {e}"))?;
+    let mut socket = TcpStream::connect_timeout(&addr, Duration::from_secs(5)).map_err(|e| {
+        format!(
+            "cannot reach the ELF loader on {addr}: {e}. Start elfdr on the console and keep it \
+                 listening on port {LOADER_PORT}."
+        )
+    })?;
     socket.set_write_timeout(Some(Duration::from_secs(30))).ok();
 
     let total = PAYLOAD.len() as u64;

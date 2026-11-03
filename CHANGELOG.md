@@ -10,6 +10,7 @@
 ### Fixed
 
 - Fake sign-in upload failures now report the payload's actual reason instead of a blank `fakesignin:` message.
+- Connection and scan messages now distinguish an unreachable console from a reachable console with elfldr stopped, and explain the ports involved: elfldr on 9021 and the installer payload on 47291.
 
 ## 1.2.0 — 2026-11-03
 

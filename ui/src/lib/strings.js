@@ -48,10 +48,17 @@ export const strings = {
     connecting: 'Connecting…',
     scan: 'Scan',
     scanning: 'Scanning…',
+    scanNothingFound:
+      'No console was found. A scan only detects elfldr on TCP port 9021 or a running installer payload on port 47291. Start elfldr on the PS5, then scan again.',
     found: 'Found on your network',
     loaderFound: 'Loader found, payload not loaded',
     payloadLoaded: 'Payload loaded',
     nothingAnswered: 'Nothing answered on',
+    consoleUpNoLoader: (ip) => `Console ${ip} is up, but elfldr is not running`,
+    loaderMissingHint:
+      'Start elfldr on the PS5 and make sure it listens on TCP port 9021, then connect again.',
+    consoleDownHint:
+      'Check that the console is on and on the same network, then start the exploit and elfldr on TCP port 9021.',
     consoleUnreachable: 'The console did not answer.',
     sendPayload: 'Send payload',
     sending: 'Sending…',
