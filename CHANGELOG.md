@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.3.0 — 2026-11-03
+
 ### Added
 
 - Debian packages (`.deb`) for Debian/Ubuntu on amd64 and arm64.
