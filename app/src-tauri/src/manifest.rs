@@ -183,7 +183,10 @@ mod tests {
             build_for_firmware("11.39").map(|b| b.build.as_str()),
             Some("v01.000.003")
         );
-        assert!(build_for_firmware("11.40").is_none());
+        assert_eq!(
+            build_for_firmware("11.40").map(|b| b.build.as_str()),
+            Some("v01.000.003")
+        );
         assert_eq!(
             build_for_firmware("11.41").map(|b| b.build.as_str()),
             Some("v01.000.003")
@@ -206,12 +209,14 @@ mod tests {
         );
         assert_eq!(
             build_for_firmware("13.40").map(|b| b.build.as_str()),
-            Some("v01.009.253")
+            Some("v01.000.030")
         );
         assert_eq!(
             build_for_firmware("13.60").map(|b| b.build.as_str()),
-            Some("v01.009.253")
+            Some("v01.000.030")
         );
+        // Still pinned for manual use.
+        assert!(build("v01.009.253").is_some());
         assert!(build_for_firmware("4.02").is_none());
         assert!(build_for_firmware("3.00").is_none());
         assert!(build_for_firmware("13.61").is_none());

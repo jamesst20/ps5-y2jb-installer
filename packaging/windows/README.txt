@@ -11,8 +11,8 @@ Requirements
   Edge on Windows 10. If it is missing, install the Evergreen WebView2
   Runtime from Microsoft.
 - The PS5 must be on firmware 4.03-13.60, with kernel read/write access and
-  an ELF loader listening on port 9021. Firmware 11.40 is not supported by
-  the Y2JB autoloader.
+  an ELF loader listening on port 9021. Firmware 11.40 is supported by the
+  Y2JB autoloader since v1.0.4.
 
 No administrator rights, WSL, MSYS2, Python or .NET are needed. The
 executable carries its own runtime except for WebView2, which is part of
