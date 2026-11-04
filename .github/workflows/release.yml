@@ -468,4 +468,9 @@ jobs:
           TAG="$RELEASE_TAG"
           gh release view "$TAG" >/dev/null 2>&1 ||
             gh release create "$TAG" --draft --title "Y2JB Installer $TAG" --generate-notes
-          gh release upload "$TAG" release-assets/* --clobber
+          mapfile -t files < <(find release-assets -type f -print)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "no release assets were downloaded" >&2
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
