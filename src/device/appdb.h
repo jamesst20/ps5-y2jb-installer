@@ -10,6 +10,15 @@ typedef enum {
   APPDB_UNKNOWN,
 } appdb_updates_t;
 
+/* Every key/value row appinfo.db holds for a title, as a JSON array of {key, val} objects,
+ * or NULL when the database cannot be read. Read-only. */
+struct cJSON *appdb_title_rows(const char *title_id);
+
+/* The title's install directory as appinfo.db records it (`_org_path`), for example
+ * /mnt/ext1/user/app/PPSA01651 on the M.2 SSD. Returns 0 and fills out, or -1 when the
+ * database has no such row. Suitable as a title_app_root_fn. */
+int appdb_app_dir(const char *title_id, char *out, size_t cap);
+
 /* Reads one YouTube title's update-block state without modifying appinfo.db. */
 appdb_updates_t appdb_youtube_updates(const char *title_id);
 

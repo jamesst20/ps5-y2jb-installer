@@ -23,6 +23,16 @@ int title_index(const char *title_id);
 const title_entry_t *title_lookup(const char *title_id);
 const title_entry_t *title_by_region(const char *region);
 
+/* Resolves the directory a title is installed in (for example /user/app/PPSA01651 or, for
+ * a title on the M.2 SSD, /mnt/ext1/user/app/PPSA01651). Returns 0 and fills out when the
+ * title's app.pkg was found, -1 otherwise. */
+typedef int (*title_app_root_fn)(const char *title_id, char *out, size_t cap);
+
+/* Installs the resolver the app-path helpers consult first (the payload registers one that
+ * reads appinfo.db). Without one, or when it fails, the helpers probe the internal storage
+ * and the extended-storage mounts for app.pkg and fall back to /user/app. */
+void title_set_app_root_resolver(title_app_root_fn resolver);
+
 /* Builds one of the title's file paths. Returns 0 for a known title, -1 otherwise or when
  * the output buffer is too small. */
 int title_app_dir(const char *title_id, char *out, size_t cap);
