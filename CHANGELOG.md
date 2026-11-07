@@ -5,6 +5,7 @@
 ### Fixed
 
 - The app now waits out the 10–20 s windows in which a jailbroken console stops accepting TCP connections (every process on it, not only the payload). Payload sending and uploads retry the connection for up to 45 s, actions wait for the payload to answer before they are sent once, the status poll tolerates about 35 s of silence before it gives up, and a retried YouTube install for the same region is reported as already running instead of failing.
+- Uploads no longer end with "the console closed the connection without replying" on fast links: the app no longer half-closes the socket after the body, which made the payload's HTTP server drop the reply.
 - The console no longer shows as disconnected while a large upload is in progress. The payload now serves each request on its own thread, so a stalled disk write during an upload cannot block `/api/status`; the app ignores status timeouts while a transfer it is driving is still streaming, resumes polling once the console acknowledges the upload, waits up to 180 s for the final upload reply, and gives a manual connection probe 1.5 s instead of 250 ms.
 
 ## 1.3.0 — 2026-11-03

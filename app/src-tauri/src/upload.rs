@@ -80,7 +80,11 @@ fn put(
             });
         }
     }
-    socket.shutdown(Shutdown::Write).ok();
+    // No half-close here. Content-Length already tells the payload where the body ends,
+    // and libmicrohttpd treats a FIN that arrives before it has queued the reply as the
+    // client going away: it then closes without answering, which on a fast wired link
+    // happened on every upload. The request asks for `Connection: close`, so the payload
+    // closes once the reply is out and `read_to_string` returns.
     progress(Progress {
         kind: "upload".into(),
         label: label.into(),
