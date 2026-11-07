@@ -2,6 +2,7 @@
 #include "api_youtube.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #include "api_util.h"
@@ -39,6 +40,13 @@ http_reply_t api_youtube_install(const char *body, size_t body_len) {
   }
 
   if (install_start(title_id, upload_merged_path(), digest[0] ? digest : NULL, 1) != 0) {
+    /* The app retries requests the console did not answer. If the first one did arrive and
+     * started this very install, the retry must not read as a failure. */
+    install_status_t running;
+    install_status(&running);
+    if (running.state == INSTALL_RUNNING && strcmp(running.title_id, title_id) == 0) {
+      return result_reply(200, 1, "Installing YouTube.");
+    }
     return result_reply(409, 0, "An install is already running.");
   }
   return result_reply(200, 1, "Installing YouTube.");

@@ -35,7 +35,7 @@ fn send(app: &AppHandle, ip: &str) -> Result<u64, String> {
     let addr: SocketAddr = format!("{ip}:{LOADER_PORT}")
         .parse()
         .map_err(|e: std::net::AddrParseError| e.to_string())?;
-    let mut socket = TcpStream::connect_timeout(&addr, Duration::from_secs(5)).map_err(|e| {
+    let mut socket = crate::net::connect_retry(&addr, Duration::from_secs(45)).map_err(|e| {
         format!(
             "cannot reach the ELF loader on {addr}: {e}. Start elfdr on the console and keep it \
                  listening on port {LOADER_PORT}."

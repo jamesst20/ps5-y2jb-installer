@@ -39,7 +39,7 @@ import {
   appVersion,
 } from './desktop.js';
 import { strings as t } from './strings.js';
-import { POLL_MS, STEP_ORDER } from './constants.js';
+import { POLL_MS, STATUS_FAILURES_BEFORE_PAUSE, STEP_ORDER } from './constants.js';
 import { releaseLabel as formatReleaseLabel } from './format.js';
 
 export const OFFICIAL_DOWNLOAD0_REPO = 'itsPLK/ps5-y2jb-autoloader';
@@ -546,9 +546,11 @@ export class Installer {
       if (this.desktop) {
         this.probed = await probeConsole(this.targetIp).catch(() => null);
       }
-      // One failed poll can be a hiccup; two in a row means the console is gone (reboot,
-      // payload stopped, cable pulled). Stop polling until the user connects again.
-      if (this.failures >= 2) {
+      // A few failed polls in a row are normal: the console stops accepting connections for
+      // 10–20 s every so often. Only after about half a minute without an answer is the
+      // console treated as gone (reboot, payload stopped, cable pulled); polling then stops
+      // until the user connects again.
+      if (this.failures >= STATUS_FAILURES_BEFORE_PAUSE) {
         this.paused = true;
         this.rebootPending = false;
       }
@@ -628,7 +630,7 @@ export class Installer {
         this.total = bytes;
       }
       this.notify('connect', t.connection.waiting);
-      const up = await waitForApi(this.targetIp, 20000);
+      const up = await waitForApi(this.targetIp, 60000);
       if (!up) {
         this.notify('connect', t.connection.consoleUnreachable, false);
         return;
