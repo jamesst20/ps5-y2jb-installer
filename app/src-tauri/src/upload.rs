@@ -35,7 +35,9 @@ fn put(
     let mut socket = TcpStream::connect_timeout(&address, Duration::from_secs(5))
         .map_err(|error| format!("cannot reach the console on {address}: {error}"))?;
     socket.set_write_timeout(Some(Duration::from_secs(60))).ok();
-    socket.set_read_timeout(Some(Duration::from_secs(20))).ok();
+    // The reply only arrives after the console has fsync'ed and renamed the whole file,
+    // which for download0.dat (hundreds of MB) can take well over 20 s.
+    socket.set_read_timeout(Some(Duration::from_secs(180))).ok();
 
     let title_query = match title_id {
         Some(title) => format!("&title_id={title}"),

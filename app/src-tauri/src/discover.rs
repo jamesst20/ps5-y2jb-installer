@@ -9,6 +9,9 @@ use std::time::Duration;
 use crate::ports::{API_PORT, LOADER_PORT};
 
 const PROBE_TIMEOUT: Duration = Duration::from_millis(250);
+/// A single, user-requested probe can afford to wait: during an upload the link is
+/// saturated and a SYN can take far longer than the sweep timeout.
+const SINGLE_PROBE_TIMEOUT: Duration = Duration::from_millis(1500);
 const WORKERS: usize = 64;
 
 /// A host that answered on at least one of the two ports.
@@ -23,16 +26,20 @@ pub struct Found {
     pub alive: bool,
 }
 
-fn connect(ip: Ipv4Addr, port: u16) -> (bool, bool) {
-    match TcpStream::connect_timeout(&SocketAddr::new(IpAddr::V4(ip), port), PROBE_TIMEOUT) {
+fn connect(ip: Ipv4Addr, port: u16, timeout: Duration) -> (bool, bool) {
+    match TcpStream::connect_timeout(&SocketAddr::new(IpAddr::V4(ip), port), timeout) {
         Ok(_) => (true, false),
         Err(error) => (false, error.kind() == std::io::ErrorKind::ConnectionRefused),
     }
 }
 
 fn probe_host(ip: Ipv4Addr) -> Found {
-    let (loader, loader_refused) = connect(ip, LOADER_PORT);
-    let (api, api_refused) = connect(ip, API_PORT);
+    probe_host_with(ip, PROBE_TIMEOUT)
+}
+
+fn probe_host_with(ip: Ipv4Addr, timeout: Duration) -> Found {
+    let (loader, loader_refused) = connect(ip, LOADER_PORT, timeout);
+    let (api, api_refused) = connect(ip, API_PORT, timeout);
     Found {
         ip: ip.to_string(),
         loader,
@@ -126,7 +133,9 @@ pub async fn discover() -> Vec<Found> {
 pub async fn probe(ip: String) -> Found {
     let parsed: Option<Ipv4Addr> = ip.parse().ok();
     match parsed {
-        Some(address) => tauri::async_runtime::spawn_blocking(move || probe_host(address))
+        Some(address) => {
+            tauri::async_runtime::spawn_blocking(move || probe_host_with(address, SINGLE_PROBE_TIMEOUT))
+        }
             .await
             .unwrap_or(Found {
                 ip,
