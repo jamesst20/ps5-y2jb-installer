@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::net::{Shutdown, SocketAddr, TcpStream};
+use std::net::{Shutdown, SocketAddr};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -32,7 +32,7 @@ fn put(
     let address: SocketAddr = format!("{ip}:{}", ports::API_PORT)
         .parse()
         .map_err(|error: std::net::AddrParseError| error.to_string())?;
-    let mut socket = TcpStream::connect_timeout(&address, Duration::from_secs(5))
+    let mut socket = crate::net::connect_retry(&address, Duration::from_secs(45))
         .map_err(|error| format!("cannot reach the console on {address}: {error}"))?;
     socket.set_write_timeout(Some(Duration::from_secs(60))).ok();
     // The reply only arrives after the console has fsync'ed and renamed the whole file,
