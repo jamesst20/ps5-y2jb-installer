@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- The console no longer shows as disconnected while a large upload is in progress. The payload now serves each request on its own thread, so a stalled disk write during an upload cannot block `/api/status`; the app ignores status timeouts while a transfer it is driving is still streaming, resumes polling once the console acknowledges the upload, waits up to 180 s for the final upload reply, and gives a manual connection probe 1.5 s instead of 250 ms.
+
 ## 1.3.0 — 2026-11-03
 
 ### Added
