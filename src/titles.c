@@ -52,16 +52,59 @@ static int format_path(const char *title_id, const char *prefix, const char *lea
   return written > 0 && (size_t)written < cap ? 0 : -1;
 }
 
+static title_app_root_fn g_app_root_resolver = NULL;
+
+void title_set_app_root_resolver(title_app_root_fn resolver) {
+  g_app_root_resolver = resolver;
+}
+
+/* The internal storage first, then the M.2 SSD and other extended-storage mounts. A PS5
+ * whose default install location is the M.2 SSD puts apps under /mnt/ext1. */
+static const char *const APP_ROOTS[] = {"/user/app", "/mnt/ext1/user/app", "/mnt/ext0/user/app"};
+
+static int app_dir_has_pkg(const char *dir) {
+  char pkg[512];
+  struct stat st;
+  return snprintf(pkg, sizeof pkg, "%s/app.pkg", dir) < (int)sizeof pkg && stat(pkg, &st) == 0;
+}
+
+/* Writes the title's install directory: the resolver's answer, else the first known root
+ * holding an app.pkg, else the internal-storage path (so callers that create or report a
+ * path still get the conventional one). */
+static int app_dir(const char *title_id, char *out, size_t cap) {
+  if (!title_lookup(title_id) || !out || cap == 0) {
+    return -1;
+  }
+  if (g_app_root_resolver && g_app_root_resolver(title_id, out, cap) == 0 && app_dir_has_pkg(out)) {
+    return 0;
+  }
+  for (size_t i = 0; i < sizeof APP_ROOTS / sizeof APP_ROOTS[0]; i++) {
+    if (format_path(title_id, APP_ROOTS[i], "", out, cap) == 0 && app_dir_has_pkg(out)) {
+      return 0;
+    }
+  }
+  return format_path(title_id, APP_ROOTS[0], "", out, cap);
+}
+
+static int app_path(const char *title_id, const char *leaf, char *out, size_t cap) {
+  char dir[512];
+  if (app_dir(title_id, dir, sizeof dir) != 0 || !out || cap == 0) {
+    return -1;
+  }
+  int written = snprintf(out, cap, "%s%s", dir, leaf);
+  return written > 0 && (size_t)written < cap ? 0 : -1;
+}
+
 int title_app_dir(const char *title_id, char *out, size_t cap) {
-  return format_path(title_id, "/user/app", "", out, cap);
+  return app_path(title_id, "", out, cap);
 }
 
 int title_app_pkg(const char *title_id, char *out, size_t cap) {
-  return format_path(title_id, "/user/app", "/app.pkg", out, cap);
+  return app_path(title_id, "/app.pkg", out, cap);
 }
 
 int title_app_json(const char *title_id, char *out, size_t cap) {
-  return format_path(title_id, "/user/app", "/app.json", out, cap);
+  return app_path(title_id, "/app.json", out, cap);
 }
 
 int title_download0_dir(const char *title_id, char *out, size_t cap) {
