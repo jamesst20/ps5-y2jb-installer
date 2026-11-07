@@ -228,9 +228,13 @@ int http_server_start(unsigned short port, http_route_fn route, const http_body_
   g_route = route;
   g_sink = sink;
   unsigned int timeout = CONNECTION_TIMEOUT_SECONDS;
-  g_daemon = MHD_start_daemon(MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG, port, NULL, NULL, &on_request,
-                              NULL, MHD_OPTION_NOTIFY_COMPLETED, &on_completed, NULL, MHD_OPTION_CONNECTION_TIMEOUT,
-                              timeout, MHD_OPTION_END);
+  /* One thread per connection: with a single polling thread every request shared one loop,
+   * so a stalled disk write during a 100+ MB upload blocked /api/status and the app
+   * concluded the console had gone away mid-transfer. Every module the routes touch
+   * guards its state with a mutex, and SQLite is opened per call. */
+  g_daemon = MHD_start_daemon(MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_THREAD_PER_CONNECTION | MHD_USE_ERROR_LOG,
+                              port, NULL, NULL, &on_request, NULL, MHD_OPTION_NOTIFY_COMPLETED, &on_completed,
+                              NULL, MHD_OPTION_CONNECTION_TIMEOUT, timeout, MHD_OPTION_END);
   if (!g_daemon) {
     g_route = NULL;
     g_sink = NULL;

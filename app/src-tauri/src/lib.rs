@@ -3,6 +3,7 @@ mod cache;
 mod digest;
 mod discover;
 mod manifest;
+mod net;
 mod paths;
 mod payload;
 mod ports;

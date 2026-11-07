@@ -39,7 +39,7 @@ import {
   appVersion,
 } from './desktop.js';
 import { strings as t } from './strings.js';
-import { POLL_MS, STEP_ORDER } from './constants.js';
+import { POLL_MS, STATUS_FAILURES_BEFORE_PAUSE, STEP_ORDER } from './constants.js';
 import { releaseLabel as formatReleaseLabel } from './format.js';
 
 export const OFFICIAL_DOWNLOAD0_REPO = 'itsPLK/ps5-y2jb-autoloader';
@@ -91,6 +91,11 @@ export class Installer {
   stopped = false;
 
   reachable = $derived(this.status !== null);
+  // A file is streaming to the console. Its progress events are proof of life, so a status
+  // poll that times out meanwhile is the payload being busy, not the console going away.
+  transferring = $derived(
+    this.busy === 'upload' || this.busy === 'download0-upload' || this.busy === 'signin',
+  );
   loaderVisible = $derived(!this.reachable && this.probed !== null && this.probed.loader);
   consoleUp = $derived(!this.reachable && this.probed?.alive === true);
   canSendPayload = $derived(
@@ -529,6 +534,10 @@ export class Installer {
         await this.initialize();
       }
     } catch {
+      if (this.transferring) {
+        // Keep the last known state; the next poll after the transfer catches up.
+        return;
+      }
       this.status = null;
       this.statusError = true;
       this.connectedIp = '';
@@ -537,15 +546,24 @@ export class Installer {
       if (this.desktop) {
         this.probed = await probeConsole(this.targetIp).catch(() => null);
       }
-      // One failed poll can be a hiccup; two in a row means the console is gone (reboot,
-      // payload stopped, cable pulled). Stop polling until the user connects again.
-      if (this.failures >= 2) {
+      // A few failed polls in a row are normal: the console stops accepting connections for
+      // 10–20 s every so often. Only after about half a minute without an answer is the
+      // console treated as gone (reboot, payload stopped, cable pulled); polling then stops
+      // until the user connects again.
+      if (this.failures >= STATUS_FAILURES_BEFORE_PAUSE) {
         this.paused = true;
         this.rebootPending = false;
       }
     } finally {
       this.refreshing = false;
     }
+  };
+
+  // A transfer the console just acknowledged is proof it is up: if polling had given up
+  // on it earlier (for example during a long upload), pick it back up.
+  resumePolling = () => {
+    this.paused = false;
+    this.failures = 0;
   };
 
   useConsole = async (address) => {
@@ -612,7 +630,7 @@ export class Installer {
         this.total = bytes;
       }
       this.notify('connect', t.connection.waiting);
-      const up = await waitForApi(this.targetIp, 20000);
+      const up = await waitForApi(this.targetIp, 60000);
       if (!up) {
         this.notify('connect', t.connection.consoleUnreachable, false);
         return;
@@ -741,6 +759,7 @@ export class Installer {
     this.clearNotice('youtube');
     try {
       await uploadMerged(this.targetIp, this.build, entry.region);
+      this.resumePolling();
       const result = await youtubeInstall(entry.package_digest, entry.title_id);
       if (!result.ok) {
         this.notify(
@@ -798,6 +817,7 @@ export class Installer {
     this.clearNotice('y2jb');
     try {
       await uploadDownload0(this.targetIp, entry.title_id);
+      this.resumePolling();
       this.notify('y2jb', t.y2jb.done);
     } catch (error) {
       this.notify('y2jb', String(error), false);
@@ -829,6 +849,7 @@ export class Installer {
         },
       };
       await uploadFakesignin(this.targetIp);
+      this.resumePolling();
       await this.refresh();
       const result = await fakeSignin(account.uid);
       this.notify(

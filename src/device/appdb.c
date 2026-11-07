@@ -7,6 +7,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "cJSON.h"
 #include "paths.h"
 #include "titles.h"
 #include "crypto/sha256.h"
@@ -107,6 +108,50 @@ static int read_value(sqlite3 *db, const char *title_id, const char *key, char *
   }
   sqlite3_finalize(st);
   return rows == 1 ? 0 : -1;
+}
+
+int appdb_app_dir(const char *title_id, char *out, size_t cap) {
+  if (!out || cap == 0) {
+    return -1;
+  }
+  sqlite3 *db = NULL;
+  if (sqlite3_open_v2(LIVE_PATH, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL) != SQLITE_OK) {
+    sqlite3_close(db);
+    return -1;
+  }
+  int rc = read_value(db, title_id, "_org_path", out, cap);
+  sqlite3_close(db);
+  if (rc != 0 || out[0] != '/') {
+    return -1;
+  }
+  return 0;
+}
+
+cJSON *appdb_title_rows(const char *title_id) {
+  sqlite3 *db = NULL;
+  if (sqlite3_open_v2(LIVE_PATH, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL) != SQLITE_OK) {
+    sqlite3_close(db);
+    return NULL;
+  }
+  sqlite3_stmt *st = NULL;
+  if (sqlite3_prepare_v2(db, "SELECT key, val FROM tbl_appinfo WHERE titleId = ? ORDER BY key", -1, &st, NULL) !=
+      SQLITE_OK) {
+    sqlite3_close(db);
+    return NULL;
+  }
+  sqlite3_bind_text(st, 1, title_id, -1, SQLITE_STATIC);
+  cJSON *rows = cJSON_CreateArray();
+  while (sqlite3_step(st) == SQLITE_ROW) {
+    const unsigned char *key = sqlite3_column_text(st, 0);
+    const unsigned char *val = sqlite3_column_text(st, 1);
+    cJSON *row = cJSON_CreateObject();
+    cJSON_AddStringToObject(row, "key", key ? (const char *)key : "");
+    cJSON_AddStringToObject(row, "val", val ? (const char *)val : "");
+    cJSON_AddItemToArray(rows, row);
+  }
+  sqlite3_finalize(st);
+  sqlite3_close(db);
+  return rows;
 }
 
 static int values_match_db(sqlite3 *db, const char *title_id) {

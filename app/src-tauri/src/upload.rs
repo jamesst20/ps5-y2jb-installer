@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::net::{Shutdown, SocketAddr, TcpStream};
+use std::net::{Shutdown, SocketAddr};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -32,10 +32,12 @@ fn put(
     let address: SocketAddr = format!("{ip}:{}", ports::API_PORT)
         .parse()
         .map_err(|error: std::net::AddrParseError| error.to_string())?;
-    let mut socket = TcpStream::connect_timeout(&address, Duration::from_secs(5))
+    let mut socket = crate::net::connect_retry(&address, Duration::from_secs(45))
         .map_err(|error| format!("cannot reach the console on {address}: {error}"))?;
     socket.set_write_timeout(Some(Duration::from_secs(60))).ok();
-    socket.set_read_timeout(Some(Duration::from_secs(20))).ok();
+    // The reply only arrives after the console has fsync'ed and renamed the whole file,
+    // which for download0.dat (hundreds of MB) can take well over 20 s.
+    socket.set_read_timeout(Some(Duration::from_secs(180))).ok();
 
     let title_query = match title_id {
         Some(title) => format!("&title_id={title}"),
@@ -78,7 +80,11 @@ fn put(
             });
         }
     }
-    socket.shutdown(Shutdown::Write).ok();
+    // No half-close here. Content-Length already tells the payload where the body ends,
+    // and libmicrohttpd treats a FIN that arrives before it has queued the reply as the
+    // client going away: it then closes without answering, which on a fast wired link
+    // happened on every upload. The request asks for `Connection: close`, so the payload
+    // closes once the reply is out and `read_to_string` returns.
     progress(Progress {
         kind: "upload".into(),
         label: label.into(),
