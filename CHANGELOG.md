@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Switching the `download0.dat` repository clears the previous release selection and cache match immediately. Late responses from an earlier request no longer replace the current release list, erase it with an error, or end its loading state.
+
 ## 1.3.0 — 2026-11-03
 
 ### Added

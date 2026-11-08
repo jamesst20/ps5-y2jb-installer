@@ -58,6 +58,7 @@
 
 <Combobox.Root
   type="single"
+  allowDeselect={false}
   bind:open
   bind:value
   {items}
