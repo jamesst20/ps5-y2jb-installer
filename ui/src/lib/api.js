@@ -35,7 +35,10 @@ const isTransportError = (error) =>
  * @returns {Promise<Record<string, any> & { status: number, ok: boolean }>}
  */
 async function call(method, path, body, timeoutMs = 7500) {
-  if (!baseUrl) {
+  // Stick to the console this call started against, even if the user switches consoles
+  // while a retry is sleeping.
+  const base = baseUrl;
+  if (!base) {
     throw new Error(t.common.noConsoleSelected);
   }
   const deadline = Date.now() + STALL_RETRY_MS;
@@ -43,7 +46,7 @@ async function call(method, path, body, timeoutMs = 7500) {
     // Wait for the console to accept connections again, then act exactly once.
     for (;;) {
       try {
-        await once('GET', 'status', undefined, timeoutMs);
+        await once('GET', 'status', undefined, timeoutMs, base);
         break;
       } catch (error) {
         if (!isTransportError(error) || Date.now() >= deadline) {
@@ -52,11 +55,11 @@ async function call(method, path, body, timeoutMs = 7500) {
         await sleep(RETRY_PAUSE_MS);
       }
     }
-    return once(method, path, body, timeoutMs);
+    return once(method, path, body, timeoutMs, base);
   }
   for (;;) {
     try {
-      return await once(method, path, body, timeoutMs);
+      return await once(method, path, body, timeoutMs, base);
     } catch (error) {
       if (!isTransportError(error) || Date.now() >= deadline) {
         throw error;
@@ -66,11 +69,11 @@ async function call(method, path, body, timeoutMs = 7500) {
   }
 }
 
-async function once(method, path, body, timeoutMs) {
+async function once(method, path, body, timeoutMs, base = baseUrl) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${baseUrl}api/${path}`, {
+    const res = await fetch(`${base}api/${path}`, {
       method,
       cache: 'no-store',
       headers: body ? { 'Content-Type': 'application/json' } : {},

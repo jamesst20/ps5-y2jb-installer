@@ -557,9 +557,9 @@ export class Installer {
         this.probed = await probeConsole(this.targetIp).catch(() => null);
       }
       // A few failed polls in a row are normal: the console stops accepting connections for
-      // 10–20 s every so often. Only after about half a minute without an answer is the
-      // console treated as gone (reboot, payload stopped, cable pulled); polling then stops
-      // until the user connects again.
+      // 10–20 s every so often. Polling keeps trying for up to five failures (~35–45 s)
+      // before it pauses and waits for the user to reconnect; until then the card reflects
+      // each unanswered poll as it happens.
       if (this.failures >= STATUS_FAILURES_BEFORE_PAUSE) {
         this.paused = true;
         this.rebootPending = false;

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "appdb.h"
 
+#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -19,6 +20,11 @@
 
 #define BLOCKED_CONTENT_VERSION "99.999.999"
 #define BLOCKED_VERSION_FILE_URI "http://localhost"
+
+/* The backup helper uses a shared buffer, and two block-updates requests would also race
+ * on the same backup name. The HTTP server runs one thread per connection, so serialize
+ * the whole write path. */
+static pthread_mutex_t g_update_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static int copy_file(const char *src, const char *dst) {
   FILE *in = fopen(src, "rb");
@@ -245,7 +251,7 @@ appdb_updates_t appdb_youtube_updates(const char *title_id) {
   return APPDB_UNKNOWN;
 }
 
-int appdb_block_youtube_updates(char *msg, size_t cap) {
+static int block_youtube_updates_locked(char *msg, size_t cap) {
   int installed = installed_titles();
   if (installed == 0) {
     snprintf(msg, cap, "YouTube is not installed in any region, so there are no updates to block.");
@@ -268,4 +274,11 @@ int appdb_block_youtube_updates(char *msg, size_t cap) {
   }
   snprintf(msg, cap, "YouTube updates are blocked. Backup kept: %s", backup);
   return 0;
+}
+
+int appdb_block_youtube_updates(char *msg, size_t cap) {
+  pthread_mutex_lock(&g_update_lock);
+  int rc = block_youtube_updates_locked(msg, cap);
+  pthread_mutex_unlock(&g_update_lock);
+  return rc;
 }

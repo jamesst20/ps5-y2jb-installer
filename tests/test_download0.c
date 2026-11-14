@@ -2,11 +2,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "device/download0.h"
 #include "titles.h"
 #include "test.h"
+
+static const char *g_test_app_root;
+
+/* A stand-in for the payload's appinfo.db resolver: returns a host temporary directory. */
+static int test_app_root(const char *title_id, char *out, size_t cap) {
+  int written = snprintf(out, cap, "%s/%s", g_test_app_root, title_id);
+  return written > 0 && (size_t)written < cap ? 0 : -1;
+}
 
 static FILE *open_file(const char *path) {
   FILE *file = fopen(path, "wb");
@@ -55,6 +64,38 @@ int main(void) {
   CHECK_INT(title_app_pkg("PPSA00000", title_path, sizeof title_path), -1);
   CHECK_INT(title_index("PPSA01650"), 0);
   CHECK_INT(title_index("PPSA00000"), -1);
+
+  /* The appinfo.db resolver decides where a title lives. Extended storage uses the same
+   * helper, so a host temporary directory stands in for /mnt/ext1. */
+  char app_root[] = "/tmp/y2jb-app-XXXXXX";
+  CHECK(mkdtemp(app_root) != NULL);
+  char title_dir[256];
+  snprintf(title_dir, sizeof title_dir, "%s/PPSA01651", app_root);
+  CHECK(mkdir(title_dir, 0700) == 0);
+  char app_pkg[256];
+  snprintf(app_pkg, sizeof app_pkg, "%s/app.pkg", title_dir);
+  write_text(app_pkg, "installed youtube package");
+
+  g_test_app_root = app_root;
+  title_set_app_root_resolver(test_app_root);
+  CHECK_INT(title_app_pkg("PPSA01651", title_path, sizeof title_path), 0);
+  CHECK_STR(title_path, app_pkg);
+  CHECK_INT(title_app_dir("PPSA01651", title_path, sizeof title_path), 0);
+  CHECK_STR(title_path, title_dir);
+  CHECK_INT(title_has_app("PPSA01651"), 1);
+
+  /* A resolver answer without an app.pkg is not an installed title; keep the conventional
+   * internal-storage path so callers still get a usable location. */
+  CHECK(unlink(app_pkg) == 0);
+  CHECK_INT(title_app_pkg("PPSA01651", title_path, sizeof title_path), 0);
+  CHECK_STR(title_path, "/user/app/PPSA01651/app.pkg");
+  CHECK_INT(title_has_app("PPSA01651"), 0);
+
+  title_set_app_root_resolver(NULL);
+  CHECK_INT(title_app_pkg("PPSA01651", title_path, sizeof title_path), 0);
+  CHECK_STR(title_path, "/user/app/PPSA01651/app.pkg");
+  CHECK(rmdir(title_dir) == 0);
+  CHECK(rmdir(app_root) == 0);
 
   char dir[] = "/tmp/y2jb-download0-XXXXXX";
   CHECK(mkdtemp(dir) != NULL);

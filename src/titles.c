@@ -60,7 +60,8 @@ void title_set_app_root_resolver(title_app_root_fn resolver) {
 
 /* The internal storage first, then the M.2 SSD and other extended-storage mounts. A PS5
  * whose default install location is the M.2 SSD puts apps under /mnt/ext1. */
-static const char *const APP_ROOTS[] = {"/user/app", "/mnt/ext1/user/app", "/mnt/ext0/user/app"};
+static const char *const APP_ROOTS[] = {"/user/app", "/mnt/ext1/user/app", "/mnt/ext0/user/app",
+                                        "/mnt/usb0/user/app"};
 
 static int app_dir_has_pkg(const char *dir) {
   char pkg[512];
