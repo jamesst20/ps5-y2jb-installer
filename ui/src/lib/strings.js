@@ -51,7 +51,7 @@ export const strings = {
     scanNothingFound:
       'No console was found. A scan only detects elfldr on TCP port 9021 or a running installer payload on port 47291. Start elfldr on the PS5, then scan again.',
     found: 'Found on your network',
-    loaderFound: 'Loader found, payload not loaded',
+    loaderFound: 'elfldr found, payload not loaded',
     payloadLoaded: 'Payload loaded',
     nothingAnswered: 'Nothing answered on',
     consoleUpNoLoader: (ip) => `Console ${ip} is up, but elfldr is not running`,

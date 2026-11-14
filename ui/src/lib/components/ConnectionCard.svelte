@@ -34,25 +34,32 @@
           class="font-mono"
           bind:value={installer.ip}
           placeholder={t.connection.consoleIpPlaceholder}
+          readonly={installer.reachable || installer.loaderVisible}
           onkeydown={(event) => {
             if (event.key === 'Enter') installer.useConsole(installer.ip);
           }}
         />
       </div>
-      <Button
-        disabled={!installer.ip || installer.connecting || (installer.reachable && installer.ip === installer.connectedIp)}
-        loading={installer.connecting}
-        onclick={() => installer.useConsole(installer.ip)}
-      >
-        {installer.connecting
-          ? t.connection.connecting
-          : installer.reachable && installer.ip === installer.connectedIp
-            ? t.connection.connected
-            : t.connection.connect}
-      </Button>
-      <Button variant="outline" disabled={!installer.desktop || installer.scanning} loading={installer.scanning} onclick={installer.scan}>
-        {installer.scanning ? t.connection.scanning : t.connection.scan}
-      </Button>
+      {#if installer.reachable || installer.loaderVisible}
+        <Button
+          variant="outline"
+          disabled={installer.busy !== '' || installer.jobRunning || installer.sending}
+          onclick={installer.disconnect}
+        >
+          {t.connection.disconnect}
+        </Button>
+      {:else}
+        <Button
+          disabled={!installer.ip || installer.connecting}
+          loading={installer.connecting}
+          onclick={() => installer.useConsole(installer.ip)}
+        >
+          {installer.connecting ? t.connection.connecting : t.connection.connect}
+        </Button>
+        <Button variant="outline" disabled={!installer.desktop || installer.scanning} loading={installer.scanning} onclick={installer.scan}>
+          {installer.scanning ? t.connection.scanning : t.connection.scan}
+        </Button>
+      {/if}
     </div>
 
     <p class="text-sm">
@@ -62,19 +69,22 @@
       {:else if installer.loaderVisible}
         <span class="text-warning">●</span>
         {t.connection.loaderFound}
+        {#if installer.payload}
+          <span class="text-muted-foreground">· {t.connection.payload} {formatBytes(installer.payload.size)}</span>
+        {/if}
       {:else if installer.consoleUp}
         <span class="text-warning">●</span>
-        {t.connection.consoleUpNoLoader(installer.targetIp)}
-      {:else if installer.statusError && installer.targetIp}
+        {t.connection.consoleUpNoLoader(installer.ip)}
+      {:else if installer.statusError && installer.ip}
         <span class="text-muted-foreground">●</span>
-        {t.connection.nothingAnswered} <span class="font-mono">{installer.targetIp}</span>
+        {t.connection.nothingAnswered} <span class="font-mono">{installer.ip}</span>
       {:else}
         <span class="text-muted-foreground">●</span>
         <span class="text-muted-foreground">{t.connection.notConnected}</span>
       {/if}
     </p>
 
-    {#if !installer.reachable && installer.targetIp && !installer.loaderVisible}
+    {#if installer.statusError && !installer.loaderVisible}
       <Alert class="border-warning/40 bg-warning/10">
         <AlertDescription class="text-warning">
           {installer.consoleUp ? t.connection.loaderMissingHint : t.connection.consoleDownHint}
@@ -147,9 +157,6 @@
           </span>
         </span>
         <div class="ml-auto flex gap-2">
-          <Button variant="outline" size="xs" disabled={installer.busy !== '' || installer.jobRunning} onclick={installer.disconnect}>
-            {t.connection.disconnect}
-          </Button>
           <Button variant="ghost" size="xs" disabled={installer.busy !== '' || installer.jobRunning} onclick={installer.stopPayload}>
             {t.connection.stopPayload}
           </Button>

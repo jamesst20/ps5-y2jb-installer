@@ -231,3 +231,28 @@ test('status rows read the flat download0 and youtube lists', () => {
   assert.equal(installer.download0Rows[0].valid, false);
   assert.equal(installer.download0Rows[0].installedLabel, 'Computing…');
 });
+
+test('a probed elfldr console always offers Send payload', () => {
+  const { installer } = setup();
+  installer.desktop = true;
+  installer.ip = '10.0.0.5';
+  installer.probed = { ip: '10.0.0.5', loader: true, alive: true };
+
+  assert.equal(installer.loaderVisible, true);
+  assert.equal(installer.canSendPayload, true);
+});
+
+test('disconnect keeps the address and stops polling it', () => {
+  const { installer } = setup();
+  installer.ip = '10.0.0.5';
+  installer.paused = false;
+  installer.status = { accounts: { list: [] } };
+
+  installer.disconnect();
+
+  assert.equal(installer.ip, '10.0.0.5');
+  assert.equal(installer.paused, true);
+  assert.equal(installer.reachable, false);
+  assert.equal(installer.loaderVisible, false);
+  assert.equal(installer.statusError, false);
+});

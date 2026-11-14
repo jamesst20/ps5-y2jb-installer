@@ -72,12 +72,10 @@ const resultText = (result) =>
 export class Installer {
   appVersion = $state('');
   ip = $state('');
-  targetIp = $state('');
   found = $state([]);
   probed = $state(null);
   scanning = $state(false);
   connecting = $state(false);
-  connectedIp = $state('');
   status = $state(null);
   statusError = $state(false);
   payload = $state(null);
@@ -103,7 +101,8 @@ export class Installer {
   confirmBlock = $state(false);
   updateSelections = $state({});
   initialized = $state(false);
-  paused = $state(false);
+  // Nothing is polled until the user connects to the address in the field.
+  paused = $state(true);
   notices = $state({});
   openStep = $state('');
   accountSlot = $state('');
@@ -122,9 +121,7 @@ export class Installer {
   transferring = $derived(['upload', 'download0-upload', 'signin'].includes(this.busy));
   loaderVisible = $derived(!this.reachable && this.probed?.loader === true);
   consoleUp = $derived(!this.reachable && this.probed?.alive === true);
-  canSendPayload = $derived(
-    this.desktop && !!this.ip && this.targetIp === this.ip && !this.sending,
-  );
+  canSendPayload = $derived(this.desktop && !!this.ip && !this.sending);
   payloadPercent = $derived(progressPercent(this.sent, this.total));
   accounts = $derived(this.status?.accounts?.list ?? []);
   readyAccounts = $derived(this.accounts.filter(isReadyAccount));
@@ -434,7 +431,7 @@ export class Installer {
   discoveryLabel = (device) => {
     // "Connected" is only for the console the app is actually driving; a scan that found a
     // payload just means it is available.
-    if (this.reachable && device.ip === this.connectedIp) {
+    if (this.reachable && device.ip === this.ip) {
       return t.connection.connected;
     }
     return device.api ? t.connection.payloadLoaded : t.connection.loaderFound;
@@ -457,17 +454,24 @@ export class Installer {
     if (this.paused || this.refreshing) {
       return;
     }
-    if (!this.targetIp) {
+    const ip = this.ip;
+    if (!ip) {
       this.status = null;
       this.statusError = false;
       return;
     }
     this.refreshing = true;
-    setApiBase(this.targetIp);
+    setApiBase(ip);
     try {
-      this.status = await getStatus();
+      const status = await getStatus();
+      // The address changed while this poll ran; its answer is about another console.
+      if (this.ip !== ip) {
+        this.status = null;
+        this.statusError = false;
+        return;
+      }
+      this.status = status;
       this.statusError = false;
-      this.connectedIp = this.targetIp;
       this.failures = 0;
       this.ensureAccount();
       if (this.desktop) {
@@ -480,11 +484,12 @@ export class Installer {
       }
       this.status = null;
       this.statusError = true;
-      this.connectedIp = '';
       this.openStep = '';
       this.failures += 1;
       if (this.desktop) {
-        this.probed = await probeConsole(this.targetIp).catch(() => null);
+        const probed = await probeConsole(ip).catch(() => null);
+        if (this.ip !== ip) return;
+        this.probed = probed;
       }
       // A few failed polls in a row are normal: the console stops accepting connections for
       // 10–20 s every so often. Polling keeps trying for up to five failures (~35–45 s)
@@ -511,11 +516,10 @@ export class Installer {
     if (!next) {
       return;
     }
-    if (next !== this.connectedIp) {
+    if (next !== this.ip) {
       this.rebootPending = false;
     }
     this.ip = next;
-    this.targetIp = next;
     this.found = [];
     setApiBase(next);
     rememberConsole(next).catch(() => {});
@@ -552,7 +556,7 @@ export class Installer {
   };
 
   send = async () => {
-    const address = this.targetIp;
+    const address = this.ip;
     if (!address || !this.canSendPayload) {
       return;
     }
@@ -657,14 +661,14 @@ export class Installer {
   };
 
   uploadAndInstall = (row) => {
-    if (!this.targetIp || !this.build) {
+    if (!this.ip || !this.build) {
       return;
     }
     return this.task(
       'upload',
       'youtube',
       async () => {
-        await uploadMerged(this.targetIp, this.build, row.region);
+        await uploadMerged(this.ip, this.build, row.region);
         this.resumePolling();
         // Success is shown by the install progress; only a refusal needs a notice.
         const result = await youtubeInstall(row.package_digest, row.title_id);
@@ -697,7 +701,7 @@ export class Installer {
       'download0-upload',
       'y2jb',
       async () => {
-        await uploadDownload0(this.targetIp, row.title_id);
+        await uploadDownload0(this.ip, row.title_id);
         this.resumePolling();
         this.notify('y2jb', t.y2jb.done);
       },
@@ -706,7 +710,7 @@ export class Installer {
   };
 
   fakeSigninFlow = (account) => {
-    if (!this.targetIp || !account) {
+    if (!this.ip || !account) {
       return;
     }
     return this.task(
@@ -717,7 +721,7 @@ export class Installer {
         // the payload deletes it after handing it to the loader.
         const { path, size, digest } = await fetchFakesignin();
         this.cache = { ...this.cache, fakesignin: { path, size, digest } };
-        await uploadFakesignin(this.targetIp);
+        await uploadFakesignin(this.ip);
         this.resumePolling();
         await this.refresh();
         if (this.report('accounts', await fakeSignin(account.uid))) {
@@ -769,12 +773,10 @@ export class Installer {
 
   disconnect = () => {
     this.paused = true;
-    this.targetIp = '';
     setApiBase('');
     this.status = null;
     this.statusError = false;
     this.probed = null;
-    this.connectedIp = '';
     this.failures = 0;
     this.initialized = false;
     this.rebootPending = false;
@@ -788,7 +790,7 @@ export class Installer {
   };
 
   stopPayload = () => {
-    if (!this.targetIp) {
+    if (!this.ip) {
       return;
     }
     return this.task('power', 'connect', async () => {

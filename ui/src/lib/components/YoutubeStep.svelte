@@ -132,7 +132,7 @@
                       size="sm"
                       variant={row.alreadyInstalled ? 'outline' : 'default'}
                       class="w-full sm:w-auto"
-                      disabled={!installer.targetIp ||
+                      disabled={!installer.ip ||
                         !installer.build ||
                         installer.busy !== '' ||
                         installer.jobRunning}

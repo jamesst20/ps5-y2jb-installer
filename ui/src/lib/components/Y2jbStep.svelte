@@ -208,7 +208,7 @@
                   <Button
                     size="sm"
                     class="w-full sm:w-auto"
-                    disabled={!installer.targetIp ||
+                    disabled={!installer.ip ||
                       installer.busy !== '' ||
                       !installer.cacheReady ||
                       !row.youtubeInstalled ||
@@ -224,7 +224,7 @@
                       size="sm"
                       variant="outline"
                       class="w-full sm:w-auto"
-                      disabled={!installer.targetIp || installer.busy !== '' || installer.jobRunning}
+                      disabled={!installer.ip || installer.busy !== '' || installer.jobRunning}
                       onclick={() => installer.removeDownload0File(row)}
                     >
                       {t.y2jb.uninstall}
