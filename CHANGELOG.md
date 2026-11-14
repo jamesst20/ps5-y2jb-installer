@@ -9,6 +9,7 @@
 ### Fixed
 
 - Switching the `download0.dat` repository clears the previous release selection and cache match immediately. Late responses from an earlier request no longer replace the current release list, erase it with an error, or end its loading state.
+- Progress bars for large downloads and uploads now advance smoothly: transfer events are coalesced to about ten per second, while phase changes and completion are always reported.
 - YouTube installed on the M.2 SSD (or any extended storage) is now detected. The payload read `/user/app/<title>/app.pkg` only, so a console whose default install location is the M.2 SSD showed "Not installed" and "The console did not confirm the installation" after a successful install, and update blocking skipped the title. Install paths now come from `appinfo.db` (`_org_path`), with `/mnt/ext1`, `/mnt/ext0` and `/mnt/usb0` probed as fallbacks.
 - A connection refused by the console now fails immediately instead of being retried for 45 s: that means elfldr or the payload is not listening, not that the console is in a TCP stall window.
 - The app now waits out the 10–20 s windows in which a jailbroken console stops accepting TCP connections (every process on it, not only the payload). Payload sending and uploads retry the connection for up to 45 s, actions wait for the payload to answer before they are sent once, the status poll keeps trying through about 35–45 s of silence before it pauses, and a retried YouTube install for the same region is reported as already running instead of failing.
