@@ -49,8 +49,11 @@ mod tests {
         let started = Instant::now();
         let error = connect_retry(&addr, Duration::from_secs(30)).unwrap_err();
         assert_eq!(error.kind(), std::io::ErrorKind::ConnectionRefused);
+        // Windows can take a couple of seconds to refuse a loopback connection. A retrying
+        // implementation would use the whole 30 s budget, so anything well under it proves
+        // the refusal was not retried.
         assert!(
-            started.elapsed() < Duration::from_secs(2),
+            started.elapsed() < Duration::from_secs(10),
             "a refused connection should fail immediately"
         );
     }
