@@ -5,7 +5,6 @@
 #include <string.h>
 
 int sceUserServiceInitialize(void *params);
-int sceUserServiceGetForegroundUser(uint32_t *user_id);
 int sceUserServiceGetLoginUserIdList(int *id_list);
 int sceUserServiceGetUserName(int32_t user_id, char *name, size_t max_size);
 
@@ -35,18 +34,6 @@ int accounts_init(void) {
   }
   pthread_mutex_unlock(&g_lock);
   return result;
-}
-
-int accounts_foreground(int32_t *uid) {
-  pthread_mutex_lock(&g_lock);
-  uint32_t id = 0;
-  *uid = 0;
-  int rc = sceUserServiceGetForegroundUser(&id);
-  if (rc == 0) {
-    *uid = (int32_t)id;
-  }
-  pthread_mutex_unlock(&g_lock);
-  return rc == 0 ? 0 : -1;
 }
 
 static int slot_for_name(const char *name) {

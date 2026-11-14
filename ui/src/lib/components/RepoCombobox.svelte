@@ -4,6 +4,7 @@
   import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
   import { cn } from '$lib/utils.js';
   import { strings as t } from '$lib/strings.js';
+  import { normalizeRepo } from '$lib/format.js';
 
   let {
     id = undefined,
@@ -16,7 +17,6 @@
   let open = $state(false);
   let text = $state('');
 
-  const repoPattern = /^[\w.-]+\/[\w.-]+$/;
   const query = $derived(text.trim());
   const selectedLabel = $derived(
     items.find((item) => item.value === value)?.label ?? value,
@@ -28,22 +28,16 @@
       query === '' || query === value
         ? items
         : items.filter((item) => item.label.toLowerCase().includes(query.toLowerCase()));
-    if (query !== '' && repoPattern.test(query) && !base.some((item) => item.value === query)) {
-      return [{ value: query, label: query }, ...base];
+    const slug = normalizeRepo(query);
+    if (slug && !base.some((item) => item.value === slug)) {
+      return [{ value: slug, label: slug }, ...base];
     }
     return base;
   });
 
-  function normalize(raw) {
-    return raw
-      .trim()
-      .replace(/^https?:\/\/github\.com\//, '')
-      .replace(/\/+$/, '');
-  }
-
   function commit(raw) {
-    const slug = normalize(raw);
-    if (!slug || !repoPattern.test(slug)) return;
+    const slug = normalizeRepo(raw);
+    if (!slug) return;
     if (slug !== value) onCommit?.(slug);
     open = false;
   }

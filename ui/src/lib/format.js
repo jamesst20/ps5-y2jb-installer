@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { strings as t } from './strings.js';
+
 export function formatBytes(bytes) {
   if (bytes === undefined || bytes === null) {
     return '';
@@ -7,7 +9,18 @@ export function formatBytes(bytes) {
   return bytes >= 1e9 ? `${(bytes / 1e9).toFixed(2)} GB` : `${(bytes / 1e6).toFixed(1)} MB`;
 }
 
-export function releaseLabel(release, latestTag, t) {
+export const regionName = (region) => t.youtube.regions[region] ?? region;
+
+/** Accepts "owner/repo" or a github.com URL; returns the slug, or '' when it is not one. */
+export function normalizeRepo(raw) {
+  const slug = raw
+    .trim()
+    .replace(/^https?:\/\/github\.com\//, '')
+    .replace(/\/+$/, '');
+  return /^[\w.-]+\/[\w.-]+$/.test(slug) ? slug : '';
+}
+
+export function releaseLabel(release, latestTag) {
   if (release.tag === latestTag) {
     return `${release.tag} · ${t.y2jb.releaseTagLatest}`;
   }

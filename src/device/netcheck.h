@@ -11,7 +11,4 @@ void net_start_monitor(void);
  * while the first probe is pending or the state is unknown. */
 int net_online(void);
 
-/* "unknown", "checking", "online" or "offline". */
-const char *net_state_name(void);
-
 #endif

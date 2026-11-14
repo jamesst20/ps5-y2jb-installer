@@ -86,7 +86,7 @@ test('late responses cannot replace the selected repository releases or fetch ta
   assert.deepEqual(installer.releases.map((release) => release.tag), [custom.tag]);
   assert.equal(installer.selectedDownload0Tag, custom.tag);
   installer.cache = { download0: { digest: official.digest } };
-  assert.equal(installer.cacheMatches('usa'), false);
+  assert.equal(installer.cacheReady, false);
   await installer.getDownload0('usa');
   assert.deepEqual(fetches, [{ repo: customRepo, tag: custom.tag }]);
 });
@@ -117,7 +117,7 @@ test('a repository change clears the selected release and cache match before set
 
   assert.equal(installer.activeRepo, customRepo);
   assert.equal(installer.selectedDownload0Tag, '');
-  assert.equal(installer.cacheMatches('usa'), false);
+  assert.equal(installer.cacheReady, false);
   assert.equal(installer.releasesLoading, true);
   assert.equal(installer.releasesLoaded, false);
   save.resolve();
@@ -190,25 +190,21 @@ test('one release selection is shared by every region', () => {
   installer.setDownload0Tag(custom.tag);
 
   assert.equal(installer.selectedDownload0Tag, custom.tag);
-  assert.equal(installer.download0Rows[0].cacheMatches, false);
+  assert.equal(installer.cacheReady, false);
 
   installer.cache = { download0: { digest: custom.digest } };
-  assert.equal(installer.cacheMatches(), true);
-  assert.equal(installer.download0Rows[0].cacheMatches, true);
+  assert.equal(installer.cacheReady, true);
+  assert.equal(installer.cacheReady, true);
 
   installer.setDownload0Tag(official.tag);
   assert.equal(installer.selectedDownload0Tag, official.tag);
-  assert.equal(installer.cacheMatches(), false);
+  assert.equal(installer.cacheReady, false);
 });
 
 test('update blocking starts with every installed region checked', () => {
   const { installer } = setup();
   installer.status = {
-    youtube: {
-      regions: [
-        { title_id: 'PPSA01650', installed: true, updates: 'not_blocked' },
-      ],
-    },
+    youtube: [{ title_id: 'PPSA01650', installed: true, updates: 'not_blocked' }],
   };
 
   assert.deepEqual(installer.installedRegions.map((row) => row.region), ['usa']);
@@ -217,4 +213,21 @@ test('update blocking starts with every installed region checked', () => {
 
   installer.setUpdateChecked('usa', false);
   assert.deepEqual(installer.selectedUpdateRows, []);
+});
+
+test('status rows read the flat download0 and youtube lists', () => {
+  const { installer } = setup();
+  installer.manifest.builds[0].regions[0].package_digest = 'c'.repeat(64);
+  installer.status = {
+    youtube: [{ title_id: 'PPSA01650', installed: true, package_digest: 'c'.repeat(64) }],
+    download0: [{ title_id: 'PPSA01650', present: true, version: 'v1', version_state: 'ready' }],
+  };
+
+  assert.equal(installer.youtubeRows[0].alreadyInstalled, true);
+  assert.equal(installer.download0Rows[0].valid, true);
+  assert.equal(installer.download0Rows[0].youtubeInstalled, true);
+
+  installer.status = { ...installer.status, download0: [{ ...installer.status.download0[0], version_state: 'computing' }] };
+  assert.equal(installer.download0Rows[0].valid, false);
+  assert.equal(installer.download0Rows[0].installedLabel, 'Computing…');
 });

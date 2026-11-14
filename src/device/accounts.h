@@ -21,9 +21,6 @@ typedef struct {
 /* Initializes SceUserService. Safe to call repeatedly. Returns 0 on success. */
 int accounts_init(void);
 
-/* Writes the foreground user ID to uid. Returns 0 on success. */
-int accounts_foreground(int32_t *uid);
-
 /* Fills out with up to max accounts in slot order. Returns the count, or -1 when the
  * login list cannot be read. */
 int accounts_list(account_info_t *out, int max);

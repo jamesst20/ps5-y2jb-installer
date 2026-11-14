@@ -4,6 +4,7 @@
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
   import { strings as t } from '$lib/strings.js';
+  import { regionName } from '$lib/format.js';
   import Step from '$lib/components/Step.svelte';
   import Notice from '$lib/components/Notice.svelte';
 
@@ -71,7 +72,7 @@
                     {t.youtube.region}
                   </span>
                   <span class="block truncate text-sm font-medium">
-                    {t.youtube.regions[row.region] ?? row.region}
+                    {regionName(row.region)}
                   </span>
                   <span class="block font-mono text-[10px] text-muted-foreground">{row.title_id}</span>
                 </div>
@@ -101,31 +102,22 @@
                     <span class="text-xs text-muted-foreground">{t.common.computing}</span>
                   {:else if row.cached?.merged}
                     <span class="text-xs font-medium text-success">{t.youtube.downloaded}</span>
-                  {:else if row.cached}
+                  {:else}
                     <div class="flex flex-col items-start gap-1">
-                      <span class="text-xs font-medium text-warning">{t.youtube.partial}</span>
+                      {#if row.cached}
+                        <span class="text-xs font-medium text-warning">{t.youtube.partial}</span>
+                      {/if}
                       <Button
                         size="sm"
                         variant="outline"
                         class="w-full sm:w-auto"
                         disabled={!installer.desktop || !installer.build || installer.busy !== ''}
                         loading={installer.busy === 'fetch' && installer.busyRegion === row.region}
-                        onclick={() => installer.fetchAndJoin(row.region)}
+                        onclick={() => installer.fetchAndJoin(row)}
                       >
                         {t.youtube.download}
                       </Button>
                     </div>
-                  {:else}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      class="w-full sm:w-auto"
-                      disabled={!installer.desktop || !installer.build || installer.busy !== ''}
-                      loading={installer.busy === 'fetch' && installer.busyRegion === row.region}
-                      onclick={() => installer.fetchAndJoin(row.region)}
-                    >
-                      {t.youtube.download}
-                    </Button>
                   {/if}
                 </div>
 
@@ -145,7 +137,7 @@
                         installer.busy !== '' ||
                         installer.jobRunning}
                       loading={installer.busy === 'upload' && installer.busyRegion === row.region}
-                      onclick={() => installer.uploadAndInstall(row.region)}
+                      onclick={() => installer.uploadAndInstall(row)}
                     >
                       {row.alreadyInstalled ? t.youtube.reinstall : t.youtube.install}
                     </Button>

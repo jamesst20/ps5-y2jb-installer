@@ -9,40 +9,14 @@
 #include "cJSON.h"
 #include "account/fakesignin.h"
 
-static const char B64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-#define ACCOUNT_ID_B64_LEN 16
-static void account_id_b64(uint64_t id, char out[ACCOUNT_ID_B64_LEN]) {
-  unsigned char raw[8];
-  for (int i = 0; i < 8; i++) {
-    raw[i] = (unsigned char)(id >> (8 * i));
-  }
-  int j = 0;
-  for (int i = 0; i < 8; i += 3) {
-    unsigned v = (unsigned)raw[i] << 16;
-    if (i + 1 < 8) v |= (unsigned)raw[i + 1] << 8;
-    if (i + 2 < 8) v |= raw[i + 2];
-    out[j++] = B64[(v >> 18) & 63];
-    out[j++] = B64[(v >> 12) & 63];
-    out[j++] = (i + 1 < 8) ? B64[(v >> 6) & 63] : '=';
-    out[j++] = (i + 2 < 8) ? B64[v & 63] : '=';
-  }
-  out[j] = '\0';
-}
-
 static cJSON *account_json(const account_info_t *a) {
   cJSON *o = cJSON_CreateObject();
   if (!o) {
     return NULL;
   }
-  char hex[24], b64[ACCOUNT_ID_B64_LEN];
-  snprintf(hex, sizeof hex, "0x%016llx", (unsigned long long)a->account_id);
-  account_id_b64(a->account_id, b64);
   cJSON_AddNumberToObject(o, "uid", a->uid);
   cJSON_AddStringToObject(o, "name", a->name);
   cJSON_AddNumberToObject(o, "slot", a->slot);
-  cJSON_AddStringToObject(o, "account_id_hex", hex);
-  cJSON_AddStringToObject(o, "account_id_b64", b64);
   cJSON_AddBoolToObject(o, "activated", a->activated);
   cJSON_AddBoolToObject(o, "signed_in", a->signed_in);
   cJSON_AddBoolToObject(o, "logged_in", a->logged_in);
@@ -64,10 +38,6 @@ cJSON *accounts_summary(void) {
     cJSON_AddStringToObject(root, "error", "SceUserService could not start.");
     return root;
   }
-
-  int32_t fg = 0;
-  accounts_foreground(&fg);
-  cJSON_AddNumberToObject(root, "foreground_uid", fg);
 
   account_info_t users[ACCOUNT_LOGIN_MAX];
   int n = accounts_list(users, ACCOUNT_LOGIN_MAX);

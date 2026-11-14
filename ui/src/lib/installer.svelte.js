@@ -10,6 +10,7 @@ import {
   blockYoutubeUpdates,
   removeDownload0,
   shutdownPayload,
+  isTransportError,
 } from './api.js';
 import {
   isDesktop,
@@ -41,9 +42,32 @@ import {
 } from './desktop.js';
 import { strings as t } from './strings.js';
 import { POLL_MS, STATUS_FAILURES_BEFORE_PAUSE, STEP_ORDER } from './constants.js';
-import { releaseLabel as formatReleaseLabel } from './format.js';
+import { normalizeRepo, progressPercent, regionName, releaseLabel } from './format.js';
 
 export const OFFICIAL_DOWNLOAD0_REPO = 'itsPLK/ps5-y2jb-autoloader';
+
+const INSTALL_PHASES = {
+  transferring: t.youtube.installTransferring,
+  promoting: t.youtube.installPromoting,
+  playable: t.youtube.installFinishing,
+  completed: t.youtube.installFinishing,
+  error: t.youtube.installFailed,
+};
+
+const YOUTUBE_TRANSFERS = ['base', 'sc', 'merged'];
+
+const isReadyAccount = (account) => account.logged_in && account.activated && account.signed_in;
+
+/** Native commands reject with a string; payload calls with a fetch or timeout error. */
+function errorText(error) {
+  if (typeof error === 'string') return error;
+  if (isTransportError(error)) return t.connection.consoleUnreachable;
+  return error?.message ?? String(error);
+}
+
+/** A payload reply as a notice: its message, or the HTTP status when it has none. */
+const resultText = (result) =>
+  result.message ?? (result.ok ? '' : t.common.errorStatus(result.status));
 
 export class Installer {
   appVersion = $state('');
@@ -80,39 +104,34 @@ export class Installer {
   updateSelections = $state({});
   initialized = $state(false);
   paused = $state(false);
-  refreshing = $state(false);
-  failures = $state(0);
   notices = $state({});
   openStep = $state('');
   accountSlot = $state('');
 
   desktop = isDesktop;
   timer = null;
-  unlistenPayload = null;
-  unlistenTransfer = null;
+  unlisten = [];
   stopped = false;
+  refreshing = false;
+  failures = 0;
   releaseRequest = 0;
 
   reachable = $derived(this.status !== null);
   // A file is streaming to the console. Its progress events are proof of life, so a status
   // poll that times out meanwhile is the payload being busy, not the console going away.
-  transferring = $derived(
-    this.busy === 'upload' || this.busy === 'download0-upload' || this.busy === 'signin',
-  );
-  loaderVisible = $derived(!this.reachable && this.probed !== null && this.probed.loader);
+  transferring = $derived(['upload', 'download0-upload', 'signin'].includes(this.busy));
+  loaderVisible = $derived(!this.reachable && this.probed?.loader === true);
   consoleUp = $derived(!this.reachable && this.probed?.alive === true);
   canSendPayload = $derived(
     this.desktop && !!this.ip && this.targetIp === this.ip && !this.sending,
   );
-  payloadPercent = $derived(
-    this.total > 0 ? Math.min(100, (this.sent / this.total) * 100) : 0,
-  );
+  payloadPercent = $derived(progressPercent(this.sent, this.total));
   accounts = $derived(this.status?.accounts?.list ?? []);
+  readyAccounts = $derived(this.accounts.filter(isReadyAccount));
   kernelReady = $derived(this.status?.kernel_rw === true);
-  selectedBuild = $derived(
-    this.manifest?.builds?.find((entry) => entry.build === this.build) ?? null,
+  regions = $derived(
+    this.manifest?.builds?.find((entry) => entry.build === this.build)?.regions ?? [],
   );
-  regions = $derived(this.selectedBuild?.regions ?? []);
   latestTag = $derived(
     this.releases.find((release) => !release.prerelease)?.tag ?? this.releases[0]?.tag ?? '',
   );
@@ -124,18 +143,19 @@ export class Installer {
   releaseItems = $derived(
     this.releases.map((release) => ({
       value: release.tag,
-      label: formatReleaseLabel(release, this.latestTag, t),
+      label: releaseLabel(release, this.latestTag),
     })),
   );
 
   // The cached file is identified by its real digest, matched against the release list.
   // A digest that is not listed is shown as an unknown version instead of a guess.
   cacheTag = $derived(
-    this.cache?.download0?.digest
-      ? (this.releases.find((release) => release.digest === this.cache.download0.digest)?.tag ??
-        '')
-      : '',
+    (this.cache?.download0?.digest &&
+      this.releases.find((release) => release.digest === this.cache.download0.digest)?.tag) ||
+      '',
   );
+  // The cached download0.dat is the release selected for upload.
+  cacheReady = $derived(!!this.cacheTag && this.cacheTag === this.selectedDownload0Tag);
 
   cacheLabel = $derived.by(() => {
     if (this.cacheLoading) return t.common.computing;
@@ -146,28 +166,17 @@ export class Installer {
   youtubeRows = $derived.by(() =>
     this.regions.map((entry) => {
       const status =
-        (this.status?.youtube?.regions ?? []).find(
-          (row) => row.title_id === entry.title_id,
-        ) ?? null;
+        this.status?.youtube?.find((row) => row.title_id === entry.title_id) ?? null;
       const cached =
-        (this.cache?.pkgs ?? []).find(
-          (pkg) => pkg.build === this.build && pkg.region === entry.region,
-        ) ?? null;
-      const match = status?.package_digest
-        ? ((this.manifest?.builds ?? [])
-            .flatMap((build) =>
-              build.regions.map((region) => ({ build: build.build, ...region })),
-            )
-            .find((candidate) => candidate.package_digest === status.package_digest) ?? null)
-        : null;
+        this.cache?.pkgs?.find((pkg) => pkg.build === this.build && pkg.region === entry.region) ??
+        null;
+      // Package digests are unique per build and region, so a match means this exact PKG.
       const alreadyInstalled =
         status?.installed === true &&
-        match !== null &&
-        match.build === this.build &&
-        match.region === entry.region;
-      const job = this.status?.jobs?.install ?? null;
-      const installJob =
-        job && job.title_id === entry.title_id && job.state !== 'idle' ? job : null;
+        !!status.package_digest &&
+        status.package_digest === entry.package_digest;
+      const job = this.status?.jobs?.install;
+      const installJob = job?.title_id === entry.title_id && job.state !== 'idle' ? job : null;
       return { ...entry, status, cached, alreadyInstalled, installJob };
     }),
   );
@@ -175,23 +184,16 @@ export class Installer {
   download0Rows = $derived.by(() =>
     this.regions.map((entry) => {
       const status =
-        (this.status?.files?.download0 ?? []).find(
-          (row) => row.title_id === entry.title_id,
-        ) ?? null;
-      const selectedTag = this.selectedDownload0Tag;
-      const cacheMatches = !!this.cacheTag && this.cacheTag === selectedTag;
-      const youtube = (this.status?.youtube?.regions ?? []).find(
-        (row) => row.title_id === entry.title_id,
-      );
+        this.status?.download0?.find((row) => row.title_id === entry.title_id) ?? null;
+      const youtube = this.status?.youtube?.find((row) => row.title_id === entry.title_id);
       const version = status?.version ?? '';
-      const versionState = status?.version_state ?? '';
-      const valid = status?.y2jb ?? (status?.version_state === 'ready');
+      const valid = status?.present === true && status.version_state === 'ready';
       // Upstream Gezine version strings such as "Y2JB 1.7 by Gezine" are not release tags,
       // so do not compare them with the repository's latest tag.
       const releaseComparable = /^[vV0-9]/.test(version);
       const installedLabel = !status?.present
         ? t.common.notInstalled
-        : versionState === 'computing'
+        : status.version_state === 'computing'
           ? t.common.computing
           : valid
             ? version || t.y2jb.unknownVersion
@@ -199,12 +201,11 @@ export class Installer {
       return {
         ...entry,
         status,
-        cacheMatches,
         youtubeInstalled: youtube?.installed === true,
         valid,
         installedLabel,
         updateAvailable:
-          valid && releaseComparable && !!version && !!this.latestTag && version !== this.latestTag,
+          valid && releaseComparable && !!this.latestTag && version !== this.latestTag,
       };
     }),
   );
@@ -225,14 +226,10 @@ export class Installer {
   selectedUpdateRows = $derived(
     this.installedRegions.filter((row) => this.updateChecked(row.region)),
   );
-  readyRegions = $derived(
-    this.download0Rows.filter((row) => row.valid === true),
-  );
+  readyRegions = $derived(this.download0Rows.filter((row) => row.valid));
 
   stepDone = $derived({
-    accounts: this.accounts.some(
-      (account) => account.logged_in && account.activated && account.signed_in,
-    ),
+    accounts: this.readyAccounts.length > 0,
     youtube: this.installedRegions.length > 0,
     y2jb: this.readyRegions.length > 0,
     updates:
@@ -247,53 +244,21 @@ export class Installer {
     this.accounts.map((account) => ({ value: String(account.slot), label: account.name })),
   );
 
-  accountsSummary = $derived(
-    this.accounts
-      .filter((account) => account.logged_in && account.activated && account.signed_in)
-      .map((account) => account.name)
-      .join(', '),
-  );
-  youtubeSummary = $derived(
-    this.installedRegions
-      .map((row) => t.youtube.regions[row.region] ?? row.region)
-      .join(', '),
-  );
-  y2jbSummary = $derived(
-    this.readyRegions
-      .map((row) => t.youtube.regions[row.region] ?? row.region)
-      .join(', '),
-  );
+  accountsSummary = $derived(this.readyAccounts.map((account) => account.name).join(', '));
+  youtubeSummary = $derived(this.installedRegions.map((row) => regionName(row.region)).join(', '));
+  y2jbSummary = $derived(this.readyRegions.map((row) => regionName(row.region)).join(', '));
   updatesSummary = $derived(this.stepDone.updates ? t.updates.blocked : '');
 
   youtubeTransfer = $derived(
-    this.transfer && ['base', 'sc', 'merged'].includes(this.transfer.label)
-      ? this.transfer
-      : null,
+    YOUTUBE_TRANSFERS.includes(this.transfer?.label) ? this.transfer : null,
   );
-  download0Transfer = $derived(
-    this.transfer?.label === 'download0' ? this.transfer : null,
-  );
-  signinTransfer = $derived(
-    this.transfer?.label === 'fakesignin' ? this.transfer : null,
-  );
+  download0Transfer = $derived(this.transfer?.label === 'download0' ? this.transfer : null);
+  signinTransfer = $derived(this.transfer?.label === 'fakesignin' ? this.transfer : null);
 
   setDownload0Tag = (tag) => {
     if (tag) {
       this.download0Tag = tag;
     }
-  };
-
-  // Keep the selected release valid after a repository change or the release list refresh.
-  ensureDownload0Tag = () => {
-    if (!this.download0Tag || !this.releases.some((release) => release.tag === this.download0Tag)) {
-      this.download0Tag = this.latestTag;
-    }
-  };
-
-  titleFor = (region) => this.regions.find((entry) => entry.region === region) ?? null;
-
-  cacheMatches = () => {
-    return !!this.cacheTag && this.cacheTag === this.selectedDownload0Tag;
   };
 
   start = async () => {
@@ -323,24 +288,29 @@ export class Installer {
 
   stop = () => {
     this.stopped = true;
-    if (this.timer !== null) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
-    if (this.unlistenPayload) {
-      this.unlistenPayload();
-      this.unlistenPayload = null;
-    }
-    if (this.unlistenTransfer) {
-      this.unlistenTransfer();
-      this.unlistenTransfer = null;
-    }
+    clearInterval(this.timer);
+    this.timer = null;
+    this.unlisten.splice(0).forEach((off) => off());
+  };
+
+  // Subscribes to a native event, dropping the subscription if the app stopped meanwhile.
+  listen = async (subscribe, handler) => {
+    const off = await subscribe(handler);
+    if (this.stopped) off();
+    else this.unlisten.push(off);
   };
 
   loadInitialData = async () => {
     // The release list, the manifests and the cache hash are independent; start them all
     // together. cacheStatus hashes the cached image, so it is the slow one.
     this.loadReleases();
+    this.listen(onPayloadProgress, (progress) => {
+      this.sent = progress.sent;
+      this.total = progress.total;
+    });
+    this.listen(onTransferProgress, (progress) => {
+      this.transfer = progress;
+    });
     this.cacheLoading = true;
     try {
       // The version and payload are instant. Do not hold the payload behind the cache scan;
@@ -357,32 +327,12 @@ export class Installer {
       this.cache = nextCache;
     } catch (error) {
       if (!this.stopped) {
-        this.notify('connect', String(error), false);
+        this.notify('connect', errorText(error), false);
       }
     } finally {
       if (!this.stopped) {
         this.cacheLoading = false;
       }
-    }
-
-    if (this.stopped) return;
-
-    this.unlistenPayload = await onPayloadProgress((progress) => {
-      this.sent = progress.sent;
-      this.total = progress.total;
-    });
-    if (this.stopped) {
-      this.unlistenPayload();
-      this.unlistenPayload = null;
-      return;
-    }
-
-    this.unlistenTransfer = await onTransferProgress((progress) => {
-      this.transfer = progress;
-    });
-    if (this.stopped) {
-      this.unlistenTransfer();
-      this.unlistenTransfer = null;
     }
   };
 
@@ -397,7 +347,6 @@ export class Installer {
       const releases = await download0Releases(repo);
       if (!isCurrent()) return;
       this.releases = releases;
-      this.ensureDownload0Tag();
     } catch {
       if (!isCurrent()) return;
       this.releases = [];
@@ -411,26 +360,47 @@ export class Installer {
   };
 
   notify = (step, text, ok = true) => {
-    if (!text) {
-      return;
+    if (text) {
+      this.notices = { ...this.notices, [step]: { text, ok } };
     }
-    this.notices = { ...this.notices, [step]: { text, ok } };
   };
 
   clearNotice = (step) => {
-    if (!(step in this.notices)) {
-      return;
+    if (step in this.notices) {
+      const { [step]: _, ...rest } = this.notices;
+      this.notices = rest;
     }
-    const next = { ...this.notices };
-    delete next[step];
-    this.notices = next;
+  };
+
+  // Shows a payload reply in the step's notice and returns whether it succeeded.
+  report = (step, result) => {
+    this.notify(step, resultText(result), result.ok === true);
+    return result.ok === true;
+  };
+
+  // Runs one user action: marks it busy, clears the step's notice, puts any error there,
+  // and always resets the busy state (and polls the console when asked).
+  task = async (busy, step, action, { region = '', refresh = false } = {}) => {
+    this.busy = busy;
+    this.busyRegion = region;
+    this.transfer = null;
+    this.clearNotice(step);
+    try {
+      await action();
+    } catch (error) {
+      this.notify(step, errorText(error), false);
+    } finally {
+      this.busy = '';
+      this.busyRegion = '';
+      this.transfer = null;
+      if (refresh) await this.refresh();
+    }
   };
 
   selectStep = (step) => {
-    if (!this.reachable) {
-      return;
+    if (this.reachable) {
+      this.openStep = this.openStep === step ? '' : step;
     }
-    this.openStep = this.openStep === step ? '' : step;
   };
 
   goToStep = (step) => {
@@ -449,47 +419,28 @@ export class Installer {
 
   // Keep the account dropdown on a real account, preferring the one logged in now.
   ensureAccount = () => {
-    if (this.accounts.length === 0) {
-      this.accountSlot = '';
+    if (this.accounts.some((account) => String(account.slot) === this.accountSlot)) {
       return;
     }
-    if (!this.accounts.some((account) => String(account.slot) === this.accountSlot)) {
-      const preferred = this.accounts.find((account) => account.logged_in) ?? this.accounts[0];
-      this.accountSlot = String(preferred.slot);
-    }
+    const preferred = this.accounts.find((account) => account.logged_in) ?? this.accounts[0];
+    this.accountSlot = preferred ? String(preferred.slot) : '';
   };
 
-  stepState = (step) => {
-    return this.stepDone[step] ? 'done' : this.openStep === step ? 'active' : 'todo';
-  };
+  stepState = (step) =>
+    this.stepDone[step] ? 'done' : this.openStep === step ? 'active' : 'todo';
 
-  installPhase = (job) => {
-    switch (job?.console_status) {
-      case 'transferring':
-        return t.youtube.installTransferring;
-      case 'promoting':
-        return t.youtube.installPromoting;
-      case 'playable':
-      case 'completed':
-        return t.youtube.installFinishing;
-      case 'error':
-        return t.youtube.installFailed;
-      case 'none':
-      default:
-        return t.youtube.installing;
-    }
-  };
+  installPhase = (job) => INSTALL_PHASES[job?.console_status] ?? t.youtube.installing;
 
   discoveryLabel = (device) => {
+    // "Connected" is only for the console the app is actually driving; a scan that found a
+    // payload just means it is available.
     if (this.reachable && device.ip === this.connectedIp) {
       return t.connection.connected;
     }
-    // "Connected" is only for the console the app is actually driving; a scan that found a
-    // payload just means it is available.
     return device.api ? t.connection.payloadLoaded : t.connection.loaderFound;
   };
 
-  releaseLabel = (release) => formatReleaseLabel(release, this.latestTag, t);
+  releaseLabel = (release) => releaseLabel(release, this.latestTag);
 
   initialize = async () => {
     if (this.initialized || !this.status) {
@@ -498,9 +449,7 @@ export class Installer {
     if (!this.manifest) {
       this.manifest = await manifestView();
     }
-    const expected = await expectedBuild(this.status.firmware);
-    this.build = expected ?? '';
-    this.ensureDownload0Tag();
+    this.build = (await expectedBuild(this.status.firmware)) ?? '';
     this.initialized = true;
   };
 
@@ -550,8 +499,8 @@ export class Installer {
     }
   };
 
-  // A transfer the console just acknowledged is proof it is up: if polling had given up
-  // on it earlier (for example during a long upload), pick it back up.
+  // Polls a console from scratch: after a (re)connect, or after a transfer the console just
+  // acknowledged, which proves it is up even if polling gave up on it during the upload.
   resumePolling = () => {
     this.paused = false;
     this.failures = 0;
@@ -568,11 +517,10 @@ export class Installer {
     this.ip = next;
     this.targetIp = next;
     this.found = [];
-    setApiBase(this.targetIp);
+    setApiBase(next);
     rememberConsole(next).catch(() => {});
     this.connecting = true;
-    this.paused = false;
-    this.failures = 0;
+    this.resumePolling();
     this.initialized = false;
     this.probed = null;
     this.clearNotice('connect');
@@ -580,8 +528,7 @@ export class Installer {
       await this.refresh();
       if (this.status) {
         this.focusNext();
-      }
-      if (!this.status && !this.probed?.loader && !this.probed?.alive) {
+      } else if (!this.probed?.loader && !this.probed?.alive) {
         this.notify('connect', t.connection.consoleUnreachable, false);
       }
     } finally {
@@ -598,7 +545,7 @@ export class Installer {
         this.notify('connect', t.connection.scanNothingFound, false);
       }
     } catch (error) {
-      this.notify('connect', String(error), false);
+      this.notify('connect', errorText(error), false);
     } finally {
       this.scanning = false;
     }
@@ -612,93 +559,63 @@ export class Installer {
     this.sending = true;
     this.sent = 0;
     this.total = this.payload?.size ?? 0;
-    setApiBase(this.targetIp);
     rememberConsole(address).catch(() => {});
     this.clearNotice('connect');
     try {
-      const bytes = await sendPayload(this.targetIp);
+      const bytes = await sendPayload(address);
       this.sent = bytes;
-      if (!this.total) {
-        this.total = bytes;
-      }
+      this.total ||= bytes;
       this.notify('connect', t.connection.waiting);
-      const up = await waitForApi(this.targetIp, 60000);
-      if (!up) {
+      if (!(await waitForApi(address, 60000))) {
         this.notify('connect', t.connection.consoleUnreachable, false);
         return;
       }
-      this.probed = { ip: this.targetIp, loader: true, api: true };
-      this.paused = false;
-      this.failures = 0;
+      this.probed = { ip: address, loader: true, api: true };
+      this.resumePolling();
       this.initialized = false;
       await this.refresh();
-      this.ip = this.targetIp;
       // waitForApi succeeded, so the payload is up. Clear "waiting" even if the immediate
       // status refresh raced with a poll; the next poll fills the state.
       this.clearNotice('connect');
       this.focusNext();
     } catch (error) {
-      this.notify('connect', String(error), false);
+      this.notify('connect', errorText(error), false);
     } finally {
       this.sending = false;
     }
   };
 
-  runAction = async (step, action) => {
-    this.busy = 'action';
-    this.clearNotice(step);
-    try {
-      const result = await action();
-      this.notify(
-        step,
-        result.message ?? (result.ok ? '' : t.common.errorStatus(result.status)),
-        result.ok === true,
-      );
-      if (result.ok && step === 'accounts') {
-        this.rebootPending = true;
-      }
-    } catch {
-      this.notify(step, t.connection.consoleUnreachable, false);
-    } finally {
-      this.busy = '';
-      await this.refresh();
-    }
-  };
-
   activateSelected = () => {
-    if (!this.selectedAccount) {
+    const account = this.selectedAccount;
+    if (!account) {
       return;
     }
-    return this.runAction('accounts', () => activate(this.selectedAccount.uid));
+    return this.task(
+      'action',
+      'accounts',
+      async () => {
+        if (this.report('accounts', await activate(account.uid))) {
+          this.rebootPending = true;
+        }
+      },
+      { refresh: true },
+    );
   };
 
-  rebootConsole = async () => {
-    this.busy = 'reboot';
-    this.clearNotice('connect');
-    try {
-      const result = await reboot();
-      this.notify(
-        'connect',
-        result.message ?? (result.ok ? '' : t.common.errorStatus(result.status)),
-        result.ok === true,
-      );
-      if (result.ok) {
+  rebootConsole = () =>
+    this.task('reboot', 'connect', async () => {
+      if (this.report('connect', await reboot())) {
         this.rebootPending = false;
       }
-    } catch {
-      this.notify('connect', t.connection.consoleUnreachable, false);
-    } finally {
-      this.busy = '';
-    }
-  };
+    });
 
-  removeDownload0File = (region) => {
-    const title = this.titleFor(region);
-    if (!title) {
-      return;
-    }
-    return this.runAction('y2jb', () => removeDownload0(title.title_id));
-  };
+  removeDownload0File = (row) =>
+    this.task(
+      'action',
+      'y2jb',
+      async () => this.report('y2jb', await removeDownload0(row.title_id)),
+      { refresh: true },
+    );
 
   updateChecked = (region) => this.updateSelections[region] !== false;
 
@@ -711,224 +628,133 @@ export class Installer {
     if (titleIds.length === 0) {
       return;
     }
-    return this.runAction('updates', () => blockYoutubeUpdates(titleIds));
+    return this.task(
+      'action',
+      'updates',
+      async () => this.report('updates', await blockYoutubeUpdates(titleIds)),
+      { refresh: true },
+    );
   };
 
-  fetchAndJoin = async (region) => {
-    const entry = this.titleFor(region);
-    if (!this.build || !entry) {
+  fetchAndJoin = (row) => {
+    const build = this.build;
+    if (!build) {
       return;
     }
-    this.busy = 'fetch';
-    this.busyRegion = entry.region;
-    this.transfer = null;
-    this.clearNotice('youtube');
-    try {
-      const result = await fetchYoutube(this.build, entry.region);
-      const pkgs = (this.cache?.pkgs ?? []).filter(
-        (pkg) => pkg.build !== this.build || pkg.region !== entry.region,
-      );
-      this.cache = {
-        download0: this.cache?.download0 ?? null,
-        fakesignin: this.cache?.fakesignin ?? null,
-        pkgs: [
-          ...pkgs,
-          {
-            build: this.build,
-            region: entry.region,
-            path: result.directory,
-            base: true,
-            sc: true,
-            merged: true,
-          },
-        ],
-      };
-    } catch (error) {
-      this.notify('youtube', String(error), false);
-    } finally {
-      this.busy = '';
-      this.busyRegion = '';
-      this.transfer = null;
-    }
-  };
-
-  uploadAndInstall = async (region) => {
-    const entry = this.titleFor(region);
-    if (!this.targetIp || !this.build || !entry) {
-      return;
-    }
-    this.busy = 'upload';
-    this.busyRegion = entry.region;
-    this.transfer = null;
-    this.clearNotice('youtube');
-    try {
-      await uploadMerged(this.targetIp, this.build, entry.region);
-      this.resumePolling();
-      const result = await youtubeInstall(entry.package_digest, entry.title_id);
-      if (!result.ok) {
-        this.notify(
-          'youtube',
-          result.message ?? t.common.errorStatus(result.status),
-          false,
+    return this.task(
+      'fetch',
+      'youtube',
+      async () => {
+        const result = await fetchYoutube(build, row.region);
+        const others = (this.cache?.pkgs ?? []).filter(
+          (pkg) => pkg.build !== build || pkg.region !== row.region,
         );
-      }
-    } catch (error) {
-      this.notify('youtube', String(error), false);
-    } finally {
-      this.busy = '';
-      this.busyRegion = '';
-      this.transfer = null;
-      await this.refresh();
-    }
+        const pkg = { build, region: row.region, path: result.directory, merged: true };
+        this.cache = { ...this.cache, pkgs: [...others, pkg] };
+      },
+      { region: row.region },
+    );
   };
 
-  getDownload0 = async () => {
+  uploadAndInstall = (row) => {
+    if (!this.targetIp || !this.build) {
+      return;
+    }
+    return this.task(
+      'upload',
+      'youtube',
+      async () => {
+        await uploadMerged(this.targetIp, this.build, row.region);
+        this.resumePolling();
+        // Success is shown by the install progress; only a refusal needs a notice.
+        const result = await youtubeInstall(row.package_digest, row.title_id);
+        if (!result.ok) this.report('youtube', result);
+      },
+      { region: row.region, refresh: true },
+    );
+  };
+
+  getDownload0 = () => {
     const tag = this.selectedDownload0Tag;
     if (!tag) {
       return;
     }
-    this.busy = 'download0-fetch';
-    this.busyRegion = '';
-    this.transfer = null;
-    this.clearNotice('y2jb');
-    try {
-      const result = await fetchDownload0(this.activeRepo, tag);
+    return this.task('download0-fetch', 'y2jb', async () => {
+      const { path, size, digest, label } = await fetchDownload0(this.activeRepo, tag);
       // The fetch already verified this digest, so publish it immediately instead of
       // hashing the same 336 MB again through cacheStatus.
-      this.cache = {
-        ...(this.cache ?? { pkgs: [], fakesignin: null }),
-        download0: { path: result.path, size: result.size, digest: result.digest },
-      };
+      this.cache = { ...this.cache, download0: { path, size, digest } };
       this.cacheLoading = false;
-      this.notify('y2jb', t.y2jb.releaseReady(result.label));
-    } catch (error) {
-      this.notify('y2jb', String(error), false);
-    } finally {
-      this.busy = '';
-      this.busyRegion = '';
-      this.transfer = null;
-    }
+      this.notify('y2jb', t.y2jb.releaseReady(label));
+    });
   };
 
-  sendDownload0 = async (region) => {
-    const entry = this.titleFor(region);
-    if (!entry || !this.cacheMatches()) {
+  sendDownload0 = (row) => {
+    if (!this.cacheReady) {
       return;
     }
-    this.busy = 'download0-upload';
-    this.busyRegion = region;
-    this.transfer = null;
-    this.clearNotice('y2jb');
-    try {
-      await uploadDownload0(this.targetIp, entry.title_id);
-      this.resumePolling();
-      this.notify('y2jb', t.y2jb.done);
-    } catch (error) {
-      this.notify('y2jb', String(error), false);
-    } finally {
-      this.busy = '';
-      this.busyRegion = '';
-      this.transfer = null;
-      await this.refresh();
-    }
+    return this.task(
+      'download0-upload',
+      'y2jb',
+      async () => {
+        await uploadDownload0(this.targetIp, row.title_id);
+        this.resumePolling();
+        this.notify('y2jb', t.y2jb.done);
+      },
+      { region: row.region, refresh: true },
+    );
   };
 
-  fakeSigninFlow = async (account) => {
+  fakeSigninFlow = (account) => {
     if (!this.targetIp || !account) {
       return;
     }
-    this.busy = 'signin';
-    this.transfer = null;
-    this.clearNotice('accounts');
-    try {
-      // The helper is not bundled. Always fetch it, put it on the console, then run it;
-      // the payload deletes it after handing it to the loader.
-      const helper = await fetchFakesignin();
-      this.cache = {
-        ...(this.cache ?? { download0: null, pkgs: [] }),
-        fakesignin: {
-          path: helper.path,
-          size: helper.size,
-          digest: helper.digest,
-        },
-      };
-      await uploadFakesignin(this.targetIp);
-      this.resumePolling();
-      await this.refresh();
-      const result = await fakeSignin(account.uid);
-      this.notify(
-        'accounts',
-        result.message ?? (result.ok ? '' : t.common.errorStatus(result.status)),
-        result.ok === true,
-      );
-      if (result.ok) {
-        this.rebootPending = true;
-      }
-    } catch (error) {
-      this.notify('accounts', String(error), false);
-    } finally {
-      this.busy = '';
-      this.transfer = null;
-      await this.refresh();
-    }
+    return this.task(
+      'signin',
+      'accounts',
+      async () => {
+        // The helper is not bundled. Always fetch it, put it on the console, then run it;
+        // the payload deletes it after handing it to the loader.
+        const { path, size, digest } = await fetchFakesignin();
+        this.cache = { ...this.cache, fakesignin: { path, size, digest } };
+        await uploadFakesignin(this.targetIp);
+        this.resumePolling();
+        await this.refresh();
+        if (this.report('accounts', await fakeSignin(account.uid))) {
+          this.rebootPending = true;
+        }
+      },
+      { refresh: true },
+    );
   };
 
-  wipeCache = async () => {
-    this.busy = 'cache';
-    try {
+  wipeCache = () =>
+    this.task('cache', 'y2jb', async () => {
       await clearCache();
       this.cache = await cacheStatus();
-    } catch (error) {
-      this.notify('y2jb', String(error), false);
-    } finally {
-      this.busy = '';
-    }
-  };
+    });
 
-  wipeDownload0Cache = async () => {
-    this.busy = 'cache';
-    this.clearNotice('y2jb');
-    try {
+  wipeDownload0Cache = () =>
+    this.task('cache', 'y2jb', async () => {
       await clearDownload0Cache();
       // Only the download0 cache changed; leave the PKG and fake-sign-in entries alone.
       this.cache = { ...this.cache, download0: null };
       this.notify('y2jb', t.y2jb.cacheDeleted);
-    } catch (error) {
-      this.notify('y2jb', String(error), false);
-    } finally {
-      this.busy = '';
-    }
-  };
+    });
 
-  wipeYoutubeCache = async () => {
-    this.busy = 'cache';
-    this.clearNotice('youtube');
-    try {
+  wipeYoutubeCache = () =>
+    this.task('cache', 'youtube', async () => {
       await clearYoutubeCache();
       // Every YouTube build and region is gone; the other caches are untouched.
-      this.cache = { ...(this.cache ?? {}), pkgs: [] };
+      this.cache = { ...this.cache, pkgs: [] };
       this.notify('youtube', t.youtube.cacheDeleted);
-    } catch (error) {
-      this.notify('youtube', String(error), false);
-    } finally {
-      this.busy = '';
-    }
-  };
+    });
 
-  stopTransfer = async () => {
-    try {
-      await cancelTransfer();
-    } catch {
-      // Nothing to stop.
-    }
-  };
+  stopTransfer = () => cancelTransfer().catch(() => {});
 
-  setRepo = async (repoSlug) => {
-    const slug = repoSlug
-      .trim()
-      .replace(/^https?:\/\/github\.com\//, "")
-      .replace(/\/+$/, "");
-    if (!slug || !/^[\w.-]+\/[\w.-]+$/.test(slug)) return;
+  setRepo = async (input) => {
+    const slug = normalizeRepo(input);
+    if (!slug) return;
     if (slug !== OFFICIAL_DOWNLOAD0_REPO && !this.customRepos.includes(slug)) {
       this.customRepos = [...this.customRepos, slug];
     }
@@ -961,19 +787,14 @@ export class Installer {
     this.openStep = '';
   };
 
-  stopPayload = async () => {
+  stopPayload = () => {
     if (!this.targetIp) {
       return;
     }
-    this.busy = 'power';
-    try {
+    return this.task('power', 'connect', async () => {
       await shutdownPayload();
       this.disconnect();
       this.notify('connect', t.connection.payloadStopped);
-    } catch (error) {
-      this.notify('connect', String(error), false);
-    } finally {
-      this.busy = '';
-    }
+    });
   };
 }

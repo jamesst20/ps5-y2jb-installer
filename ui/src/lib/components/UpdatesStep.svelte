@@ -6,6 +6,7 @@
     Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
   } from '$lib/components/ui/dialog/index.js';
   import { strings as t } from '$lib/strings.js';
+  import { regionName } from '$lib/format.js';
   import Step from '$lib/components/Step.svelte';
   import Notice from '$lib/components/Notice.svelte';
 
@@ -51,7 +52,7 @@
                   {t.updates.region}
                 </span>
                 <span class="block truncate text-sm font-medium">
-                  {t.youtube.regions[row.region] ?? row.region}
+                  {regionName(row.region)}
                 </span>
                 <span class="block font-mono text-[10px] text-muted-foreground">{row.title_id}</span>
               </div>
@@ -80,7 +81,7 @@
                 <input
                   type="checkbox"
                   class="size-4 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label={t.updates.selectRegion(t.youtube.regions[row.region] ?? row.region)}
+                  aria-label={t.updates.selectRegion(regionName(row.region))}
                   checked={installer.updateChecked(row.region)}
                   disabled={installer.busy !== ''}
                   onchange={(event) =>

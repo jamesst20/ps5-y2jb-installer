@@ -15,51 +15,49 @@ export function setApiBase(ip) {
 
 // A jailbroken console stops accepting TCP connections for 10–20 s at a time, every so
 // often, for every process on it. Requests made inside such a window never reach the
-// payload, so they are safe to repeat. GETs are retried directly; before a POST the payload
-// is first asked for its status until it answers, then the action is sent once, so a lost
-// reply cannot trigger the action twice.
+// payload. Before an action the payload is first asked for its status until it answers,
+// then the action is sent once, so a lost reply cannot trigger the action twice.
 const STALL_RETRY_MS = 45000;
 const RETRY_PAUSE_MS = 1000;
+const TIMEOUT_MS = 7500;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** True for failures that mean the request never got through, not a payload reply. */
-const isTransportError = (error) =>
-  error instanceof TypeError || (error && error.name === 'AbortError');
+export const isTransportError = (error) =>
+  error instanceof TypeError || error?.name === 'AbortError' || error?.name === 'TimeoutError';
 
 /**
+ * @param {string} base
  * @param {string} method
  * @param {string} path
  * @param {unknown} [body]
- * @param {number} [timeoutMs]
  * @returns {Promise<Record<string, any> & { status: number, ok: boolean }>}
  */
-async function call(method, path, body, timeoutMs = 7500) {
-  // Stick to the console this call started against, even if the user switches consoles
-  // while a retry is sleeping.
-  const base = baseUrl;
+async function request(base, method, path, body) {
   if (!base) {
     throw new Error(t.common.noConsoleSelected);
   }
+  const res = await fetch(`${base}api/${path}`, {
+    method,
+    cache: 'no-store',
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { status: res.status, ok: res.ok, ...data };
+}
+
+async function post(path, body) {
+  // Stick to the console this call started against, even if the user switches consoles
+  // while a retry is sleeping.
+  const base = baseUrl;
   const deadline = Date.now() + STALL_RETRY_MS;
-  if (method !== 'GET') {
-    // Wait for the console to accept connections again, then act exactly once.
-    for (;;) {
-      try {
-        await once('GET', 'status', undefined, timeoutMs, base);
-        break;
-      } catch (error) {
-        if (!isTransportError(error) || Date.now() >= deadline) {
-          throw error;
-        }
-        await sleep(RETRY_PAUSE_MS);
-      }
-    }
-    return once(method, path, body, timeoutMs, base);
-  }
   for (;;) {
     try {
-      return await once(method, path, body, timeoutMs, base);
+      await request(base, 'GET', 'status');
+      break;
     } catch (error) {
       if (!isTransportError(error) || Date.now() >= deadline) {
         throw error;
@@ -67,41 +65,16 @@ async function call(method, path, body, timeoutMs = 7500) {
       await sleep(RETRY_PAUSE_MS);
     }
   }
+  return request(base, 'POST', path, body);
 }
 
-async function once(method, path, body, timeoutMs, base = baseUrl) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(`${base}api/${path}`, {
-      method,
-      cache: 'no-store',
-      headers: body ? { 'Content-Type': 'application/json' } : {},
-      body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
-    const data = await res.json().catch(() => ({}));
-    return { status: res.status, ok: res.ok, ...data };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-export const getStatus = () => once('GET', 'status', undefined, 7500);
-export const activate = (uid) => call('POST', 'activate', { uid });
-export const fakeSignin = (uid) => call('POST', 'fakesignin', { uid });
-export const reboot = () => call('POST', 'reboot');
-export const shutdownPayload = () => call('POST', 'shutdown');
-
+export const getStatus = () => request(baseUrl, 'GET', 'status');
+export const activate = (uid) => post('activate', { uid });
+export const fakeSignin = (uid) => post('fakesignin', { uid });
+export const reboot = () => post('reboot');
+export const shutdownPayload = () => post('shutdown');
 export const youtubeInstall = (packageDigest, titleId) =>
-  call(
-    'POST',
-    'youtube/install',
-    packageDigest || titleId
-      ? { package_digest: packageDigest, title_id: titleId }
-      : undefined,
-  );
+  post('youtube/install', { package_digest: packageDigest, title_id: titleId });
 export const blockYoutubeUpdates = (titleIds) =>
-  call('POST', 'youtube/block-updates', { title_ids: titleIds });
-export const removeDownload0 = (titleId) =>
-  call('POST', 'download0/remove', { title_id: titleId });
+  post('youtube/block-updates', { title_ids: titleIds });
+export const removeDownload0 = (titleId) => post('download0/remove', { title_id: titleId });

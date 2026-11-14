@@ -124,16 +124,3 @@ int net_online(void) {
   pthread_mutex_unlock(&g_lock);
   return online;
 }
-
-const char *net_state_name(void) {
-  const char *name;
-  pthread_mutex_lock(&g_lock);
-  switch (g_state) {
-    case NET_CHECKING: name = "checking"; break;
-    case NET_ONLINE: name = "online"; break;
-    case NET_OFFLINE: name = "offline"; break;
-    default: name = "unknown"; break;
-  }
-  pthread_mutex_unlock(&g_lock);
-  return name;
-}

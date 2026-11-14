@@ -7,7 +7,7 @@
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
   } from '$lib/components/ui/select/index.js';
   import { strings as t } from '$lib/strings.js';
-  import { formatBytes } from '$lib/format.js';
+  import { formatBytes, regionName } from '$lib/format.js';
   import Step from '$lib/components/Step.svelte';
   import Notice from '$lib/components/Notice.svelte';
   import RepoCombobox from '$lib/components/RepoCombobox.svelte';
@@ -104,27 +104,12 @@
       {/if}
     </div>
 
-    {#if installer.releasesError}
+    {#if installer.releasesLoaded && installer.releases.length === 0}
       <div class="flex flex-wrap items-center gap-2">
-        <p class="text-xs text-destructive">{t.y2jb.releaseListUnavailable}</p>
-        <Button
-          size="xs"
-          variant="outline"
-          loading={installer.releasesLoading}
-          onclick={installer.loadReleases}
-        >
-          {t.y2jb.refresh}
-        </Button>
-      </div>
-    {:else if installer.releasesLoaded && !installer.releasesLoading && installer.releases.length === 0}
-      <div class="flex flex-wrap items-center gap-2">
-        <p class="text-xs text-destructive">{t.y2jb.releaseListEmpty}</p>
-        <Button
-          size="xs"
-          variant="outline"
-          loading={installer.releasesLoading}
-          onclick={installer.loadReleases}
-        >
+        <p class="text-xs text-destructive">
+          {installer.releasesError ? t.y2jb.releaseListUnavailable : t.y2jb.releaseListEmpty}
+        </p>
+        <Button size="xs" variant="outline" onclick={installer.loadReleases}>
           {t.y2jb.refresh}
         </Button>
       </div>
@@ -157,7 +142,7 @@
                   {t.y2jb.region}
                 </span>
                 <span class="block truncate text-sm font-medium">
-                  {t.youtube.regions[row.region] ?? row.region}
+                  {regionName(row.region)}
                 </span>
                 <span class="block font-mono text-[10px] text-muted-foreground">{row.title_id}</span>
               </div>
@@ -204,7 +189,7 @@
                 </span>
                 {#if !installer.cache?.download0}
                   <span class="text-xs text-muted-foreground">{t.y2jb.fetchFirst}</span>
-                {:else if row.cacheMatches}
+                {:else if installer.cacheReady}
                   <span class="text-xs font-medium text-success">{t.y2jb.downloaded}</span>
                 {:else if !installer.cacheTag}
                   <span class="text-xs font-medium text-warning">{t.y2jb.unknownVersion}</span>
@@ -225,12 +210,12 @@
                     class="w-full sm:w-auto"
                     disabled={!installer.targetIp ||
                       installer.busy !== '' ||
-                      !row.cacheMatches ||
+                      !installer.cacheReady ||
                       !row.youtubeInstalled ||
                       installer.jobRunning}
                     loading={installer.busy === 'download0-upload' &&
                       installer.busyRegion === row.region}
-                    onclick={() => installer.sendDownload0(row.region)}
+                    onclick={() => installer.sendDownload0(row)}
                   >
                     {t.y2jb.upload}
                   </Button>
@@ -240,7 +225,7 @@
                       variant="outline"
                       class="w-full sm:w-auto"
                       disabled={!installer.targetIp || installer.busy !== '' || installer.jobRunning}
-                      onclick={() => installer.removeDownload0File(row.region)}
+                      onclick={() => installer.removeDownload0File(row)}
                     >
                       {t.y2jb.uninstall}
                     </Button>
