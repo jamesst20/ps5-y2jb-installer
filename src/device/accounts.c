@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "accounts.h"
 
+#include <pthread.h>
 #include <string.h>
 
 int sceUserServiceInitialize(void *params);
@@ -18,29 +19,34 @@ int sceRegMgrGetInt(int key, int *value);
 
 #define LOGIN_ID_EMPTY (-1)
 
+static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static int g_user_service_ready = 0;
 
 int accounts_init(void) {
-  if (g_user_service_ready) {
-    return 0;
+  pthread_mutex_lock(&g_lock);
+  int result = 0;
+  if (!g_user_service_ready) {
+    int rc = sceUserServiceInitialize(NULL);
+    if (rc == 0 || rc == (int)0x80960003) {
+      g_user_service_ready = 1;
+    } else {
+      result = rc;
+    }
   }
-  int rc = sceUserServiceInitialize(NULL);
-
-  if (rc == 0 || rc == (int)0x80960003) {
-    g_user_service_ready = 1;
-    return 0;
-  }
-  return rc;
+  pthread_mutex_unlock(&g_lock);
+  return result;
 }
 
 int accounts_foreground(int32_t *uid) {
+  pthread_mutex_lock(&g_lock);
   uint32_t id = 0;
   *uid = 0;
-  if (sceUserServiceGetForegroundUser(&id) != 0) {
-    return -1;
+  int rc = sceUserServiceGetForegroundUser(&id);
+  if (rc == 0) {
+    *uid = (int32_t)id;
   }
-  *uid = (int32_t)id;
-  return 0;
+  pthread_mutex_unlock(&g_lock);
+  return rc == 0 ? 0 : -1;
 }
 
 static int slot_for_name(const char *name) {
@@ -86,11 +92,13 @@ static int read_user(int32_t uid, account_info_t *info) {
 }
 
 int accounts_list(account_info_t *out, int max) {
+  pthread_mutex_lock(&g_lock);
   int ids[ACCOUNT_LOGIN_MAX];
   for (int i = 0; i < ACCOUNT_LOGIN_MAX; i++) {
     ids[i] = LOGIN_ID_EMPTY;
   }
   if (sceUserServiceGetLoginUserIdList(ids) != 0) {
+    pthread_mutex_unlock(&g_lock);
     return -1;
   }
   int count = 0;
@@ -113,10 +121,11 @@ int accounts_list(account_info_t *out, int max) {
     fill_registry(a);
     count++;
   }
+  pthread_mutex_unlock(&g_lock);
   return count;
 }
 
-int accounts_find(int32_t uid, account_info_t *out) {
+static int accounts_find_locked(int32_t uid, account_info_t *out) {
   int ids[ACCOUNT_LOGIN_MAX];
   for (int i = 0; i < ACCOUNT_LOGIN_MAX; i++) {
     ids[i] = LOGIN_ID_EMPTY;
@@ -132,35 +141,54 @@ int accounts_find(int32_t uid, account_info_t *out) {
   return -1;
 }
 
+int accounts_find(int32_t uid, account_info_t *out) {
+  pthread_mutex_lock(&g_lock);
+  int rc = accounts_find_locked(uid, out);
+  pthread_mutex_unlock(&g_lock);
+  return rc;
+}
+
 int accounts_activate(int32_t uid, int *sce_error) {
-  account_info_t info;
+  pthread_mutex_lock(&g_lock);
   *sce_error = 0;
-  if (accounts_find(uid, &info) != 0) {
-    return -1;
+
+  account_info_t info;
+  int result = 0;
+  if (accounts_find_locked(uid, &info) != 0) {
+    result = -1;
+    goto done;
   }
   if (info.slot == 0) {
-    return -2;
+    result = -2;
+    goto done;
   }
   if (info.activated) {
-    return 1;
+    result = 1;
+    goto done;
   }
 
   uint64_t id = OffAct_GenAccountId(info.name);
   int rc = OffAct_SetAccountId(info.slot, id);
   if (rc != 0) {
     *sce_error = rc;
-    return -3;
+    result = -3;
+    goto done;
   }
   char type[ACCOUNT_TYPE_MAX] = "np";
   rc = OffAct_SetAccountType(info.slot, type);
   if (rc != 0) {
     *sce_error = rc;
-    return -3;
+    result = -3;
+    goto done;
   }
   rc = OffAct_SetAccountFlags(info.slot, OFFLINE_ACTIVATION_FLAGS);
   if (rc != 0) {
     *sce_error = rc;
-    return -3;
+    result = -3;
+    goto done;
   }
-  return 0;
+
+done:
+  pthread_mutex_unlock(&g_lock);
+  return result;
 }

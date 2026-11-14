@@ -2,25 +2,21 @@
 #include "power.h"
 
 #include <pthread.h>
+#include <stdint.h>
 #include <unistd.h>
 
 #include "notify.h"
 
 int sceSystemServiceRequestReboot(void);
 
-static unsigned int g_reboot_delay = 0;
-static unsigned int g_exit_delay = 0;
-
 static void *reboot_thread(void *arg) {
-  (void)arg;
-  sleep(g_reboot_delay);
+  sleep((unsigned int)(uintptr_t)arg);
   sceSystemServiceRequestReboot();
   return NULL;
 }
 
 static void *exit_thread(void *arg) {
-  (void)arg;
-  sleep(g_exit_delay);
+  sleep((unsigned int)(uintptr_t)arg);
   notify_send("Stopped");
 
   sleep(1);
@@ -29,24 +25,22 @@ static void *exit_thread(void *arg) {
   return NULL;
 }
 
-static int start_thread(void *(*worker)(void *)) {
+static int start_thread(void *(*worker)(void *), unsigned int seconds) {
   pthread_t thread;
   pthread_attr_t attr;
   if (pthread_attr_init(&attr) != 0) {
     return -1;
   }
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-  int rc = pthread_create(&thread, &attr, worker, NULL);
+  int rc = pthread_create(&thread, &attr, worker, (void *)(uintptr_t)seconds);
   pthread_attr_destroy(&attr);
   return rc == 0 ? 0 : -1;
 }
 
 int power_reboot_after(unsigned int seconds) {
-  g_reboot_delay = seconds;
-  return start_thread(reboot_thread);
+  return start_thread(reboot_thread, seconds);
 }
 
 int power_exit_after(unsigned int seconds) {
-  g_exit_delay = seconds;
-  return start_thread(exit_thread);
+  return start_thread(exit_thread, seconds);
 }

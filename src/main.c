@@ -5,17 +5,21 @@
 #include "api/api_router.h"
 #include "api/api_upload.h"
 #include "config.h"
+#include "device/appdb.h"
 #include "device/download0.h"
 #include "http/http_server.h"
 #include "device/instance.h"
 #include "device/netcheck.h"
 #include "device/notify.h"
 #include "device/upload.h"
+#include "titles.h"
 #include "version.h"
 
 int main(void) {
   fprintf(stderr, "y2jb-installer %s starting\n", Y2JB_VERSION);
   instance_claim_name();
+  /* Apps on the M.2 SSD live under /mnt/ext1; appinfo.db knows where each title went. */
+  title_set_app_root_resolver(appdb_app_dir);
   if (instance_take_over() < 0) {
     fprintf(stderr, "y2jb-installer: cannot read the process list; continuing\n");
   }

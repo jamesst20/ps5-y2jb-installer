@@ -1,12 +1,14 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "appdb.h"
 
+#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
+#include "cJSON.h"
 #include "paths.h"
 #include "titles.h"
 #include "crypto/sha256.h"
@@ -18,6 +20,11 @@
 
 #define BLOCKED_CONTENT_VERSION "99.999.999"
 #define BLOCKED_VERSION_FILE_URI "http://localhost"
+
+/* The backup helper uses a shared buffer, and two block-updates requests would also race
+ * on the same backup name. The HTTP server runs one thread per connection, so serialize
+ * the whole write path. */
+static pthread_mutex_t g_update_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static int copy_file(const char *src, const char *dst) {
   FILE *in = fopen(src, "rb");
@@ -107,6 +114,50 @@ static int read_value(sqlite3 *db, const char *title_id, const char *key, char *
   }
   sqlite3_finalize(st);
   return rows == 1 ? 0 : -1;
+}
+
+int appdb_app_dir(const char *title_id, char *out, size_t cap) {
+  if (!out || cap == 0) {
+    return -1;
+  }
+  sqlite3 *db = NULL;
+  if (sqlite3_open_v2(LIVE_PATH, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL) != SQLITE_OK) {
+    sqlite3_close(db);
+    return -1;
+  }
+  int rc = read_value(db, title_id, "_org_path", out, cap);
+  sqlite3_close(db);
+  if (rc != 0 || out[0] != '/') {
+    return -1;
+  }
+  return 0;
+}
+
+cJSON *appdb_title_rows(const char *title_id) {
+  sqlite3 *db = NULL;
+  if (sqlite3_open_v2(LIVE_PATH, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL) != SQLITE_OK) {
+    sqlite3_close(db);
+    return NULL;
+  }
+  sqlite3_stmt *st = NULL;
+  if (sqlite3_prepare_v2(db, "SELECT key, val FROM tbl_appinfo WHERE titleId = ? ORDER BY key", -1, &st, NULL) !=
+      SQLITE_OK) {
+    sqlite3_close(db);
+    return NULL;
+  }
+  sqlite3_bind_text(st, 1, title_id, -1, SQLITE_STATIC);
+  cJSON *rows = cJSON_CreateArray();
+  while (sqlite3_step(st) == SQLITE_ROW) {
+    const unsigned char *key = sqlite3_column_text(st, 0);
+    const unsigned char *val = sqlite3_column_text(st, 1);
+    cJSON *row = cJSON_CreateObject();
+    cJSON_AddStringToObject(row, "key", key ? (const char *)key : "");
+    cJSON_AddStringToObject(row, "val", val ? (const char *)val : "");
+    cJSON_AddItemToArray(rows, row);
+  }
+  sqlite3_finalize(st);
+  sqlite3_close(db);
+  return rows;
 }
 
 static int values_match_db(sqlite3 *db, const char *title_id) {
@@ -200,7 +251,7 @@ appdb_updates_t appdb_youtube_updates(const char *title_id) {
   return APPDB_UNKNOWN;
 }
 
-int appdb_block_youtube_updates(char *msg, size_t cap) {
+static int block_youtube_updates_locked(char *msg, size_t cap) {
   int installed = installed_titles();
   if (installed == 0) {
     snprintf(msg, cap, "YouTube is not installed in any region, so there are no updates to block.");
@@ -223,4 +274,11 @@ int appdb_block_youtube_updates(char *msg, size_t cap) {
   }
   snprintf(msg, cap, "YouTube updates are blocked. Backup kept: %s", backup);
   return 0;
+}
+
+int appdb_block_youtube_updates(char *msg, size_t cap) {
+  pthread_mutex_lock(&g_update_lock);
+  int rc = block_youtube_updates_locked(msg, cap);
+  pthread_mutex_unlock(&g_update_lock);
+  return rc;
 }

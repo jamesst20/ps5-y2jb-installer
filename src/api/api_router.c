@@ -42,6 +42,9 @@ http_reply_t api_route(const char *method, const char *path, const char *body, s
   if (post && strcmp(path, "/api/youtube/install") == 0) {
     return api_youtube_install(body, body_len);
   }
+  if (post && strcmp(path, "/api/appinfo") == 0) {
+    return api_appinfo(body, body_len);
+  }
   if (post && strcmp(path, "/api/youtube/block-updates") == 0) {
     return api_youtube_block_updates();
   }

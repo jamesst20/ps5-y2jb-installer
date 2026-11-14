@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -10,6 +10,10 @@ use tauri::{AppHandle, Emitter};
 use tokio::io::AsyncWriteExt;
 
 use crate::digest;
+
+/// Progress events can arrive faster than the webview can paint them, especially on a fast
+/// download. Coalesce them so the bar advances smoothly instead of chasing a backlog.
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
 
 #[derive(Default)]
 pub struct Transfers {
@@ -31,9 +35,42 @@ pub struct Progress {
     pub total: u64,
 }
 
+struct EmitState {
+    kind: String,
+    label: String,
+    done: u64,
+    total: u64,
+    last: Instant,
+}
+
 pub fn emitter(app: &AppHandle) -> impl Fn(Progress) + Send + Sync + 'static {
     let app = app.clone();
+    let state = Mutex::new(EmitState {
+        kind: String::new(),
+        label: String::new(),
+        done: 0,
+        total: 0,
+        last: Instant::now(),
+    });
     move |progress| {
+        let Ok(mut state) = state.lock() else {
+            return;
+        };
+        // Always report a new phase, a reset, or the final value. Otherwise only every
+        // PROGRESS_INTERVAL so the webview does not queue more updates than it can paint.
+        let boundary = progress.kind != state.kind
+            || progress.label != state.label
+            || progress.total != state.total
+            || progress.done < state.done;
+        let finished = progress.total > 0 && progress.done >= progress.total;
+        if !boundary && !finished && state.last.elapsed() < PROGRESS_INTERVAL {
+            return;
+        }
+        state.kind = progress.kind.clone();
+        state.label = progress.label.clone();
+        state.done = progress.done;
+        state.total = progress.total;
+        state.last = Instant::now();
         let _ = app.emit("transfer-progress", progress);
     }
 }
