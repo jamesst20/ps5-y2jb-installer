@@ -89,6 +89,7 @@ export class Installer {
   unlistenPayload = null;
   unlistenTransfer = null;
   stopped = false;
+  releaseRequest = 0;
 
   reachable = $derived(this.status !== null);
   loaderVisible = $derived(!this.reachable && this.probed !== null && this.probed.loader);
@@ -400,17 +401,26 @@ export class Installer {
   };
 
   loadReleases = async () => {
+    const request = ++this.releaseRequest;
+    const repo = this.activeRepo;
+    const isCurrent = () => request === this.releaseRequest && repo === this.activeRepo;
     this.releasesLoading = true;
     this.releasesError = false;
+    this.releasesLoaded = false;
     try {
-      this.releases = await download0Releases(this.activeRepo);
+      const releases = await download0Releases(repo);
+      if (!isCurrent()) return;
+      this.releases = releases;
       this.ensureTags();
     } catch {
+      if (!isCurrent()) return;
       this.releases = [];
       this.releasesError = true;
     } finally {
-      this.releasesLoading = false;
-      this.releasesLoaded = true;
+      if (isCurrent()) {
+        this.releasesLoading = false;
+        this.releasesLoaded = true;
+      }
     }
   };
 
@@ -894,8 +904,11 @@ export class Installer {
     }
     this.activeRepo = slug;
     this.download0Tags = {};
-    await setDownload0Repo(this.activeRepo, this.customRepos).catch(() => {});
-    await this.loadReleases();
+    // Invalidate the old list and its cache matches before waiting for settings.
+    this.releases = [];
+    const loading = this.loadReleases();
+    await setDownload0Repo(slug, this.customRepos).catch(() => {});
+    await loading;
   };
 
   disconnect = () => {
