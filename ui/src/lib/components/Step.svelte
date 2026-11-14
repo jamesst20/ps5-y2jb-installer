@@ -17,12 +17,20 @@
     open = false,
     locked = false,
     transfer = null,
+    phase = '',
+    percent = null,
     onStop = null,
     onOpen,
     children,
   } = $props();
 
-  let progress = $derived(transfer ? progressPercent(transfer.done, transfer.total) : null);
+  let progress = $derived(
+    transfer
+      ? progressPercent(transfer.done, transfer.total)
+      : percent === null
+        ? null
+        : Math.min(100, Math.max(0, percent)),
+  );
 </script>
 
 <section
@@ -41,7 +49,7 @@
       onclick={onOpen}
       class={cn(
         'flex min-w-0 items-center gap-3 text-left disabled:cursor-not-allowed',
-        transfer ? 'max-w-56 shrink-0' : 'flex-1',
+        transfer || phase ? 'max-w-56 shrink-0' : 'flex-1',
       )}
     >
       <StepBadge {number} {state} />
@@ -53,14 +61,25 @@
       </span>
     </button>
 
-    {#if transfer}
+    {#if transfer || phase}
       <div class="flex min-w-0 flex-1 items-center gap-2">
-        <Progress value={progress} class="h-1.5 flex-1" />
-        <span class="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
-          {formatBytes(transfer.done)} / {formatBytes(transfer.total)}
-        </span>
+        {#if phase}
+          <span class="min-w-0 truncate text-[11px] text-muted-foreground">{phase}</span>
+        {/if}
+        {#if progress !== null}
+          <Progress value={progress} class="h-1.5 min-w-8 flex-1" />
+        {/if}
+        {#if transfer}
+          <span class="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
+            {formatBytes(transfer.done)} / {formatBytes(transfer.total)}
+          </span>
+        {:else if progress !== null}
+          <span class="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
+            {Math.round(progress)}%
+          </span>
+        {/if}
       </div>
-      {#if onStop}
+      {#if transfer && onStop}
         <Button variant="outline" size="xs" class="shrink-0" onclick={onStop}>{t.common.stop}</Button>
       {/if}
     {/if}

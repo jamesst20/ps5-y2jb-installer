@@ -101,6 +101,7 @@ export const youtubeInstall = (packageDigest, titleId) =>
       ? { package_digest: packageDigest, title_id: titleId }
       : undefined,
   );
-export const blockYoutubeUpdates = () => call('POST', 'youtube/block-updates');
+export const blockYoutubeUpdates = (titleIds) =>
+  call('POST', 'youtube/block-updates', { title_ids: titleIds });
 export const removeDownload0 = (titleId) =>
   call('POST', 'download0/remove', { title_id: titleId });

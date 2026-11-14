@@ -107,9 +107,40 @@ http_reply_t api_appinfo(const char *body, size_t body_len) {
   return json_reply(200, json);
 }
 
-http_reply_t api_youtube_block_updates(void) {
+http_reply_t api_youtube_block_updates(const char *body, size_t body_len) {
+  unsigned int title_mask = 0;
+  if (body_len > 0) {
+    cJSON *root = cJSON_ParseWithLength(body, body_len);
+    if (!root) {
+      return result_reply(400, 0, "Invalid request.");
+    }
+    const cJSON *ids = cJSON_GetObjectItemCaseSensitive(root, "title_ids");
+    if (!cJSON_IsArray(ids) || cJSON_GetArraySize(ids) == 0) {
+      cJSON_Delete(root);
+      return result_reply(400, 0, "Choose at least one YouTube region.");
+    }
+    const cJSON *item = NULL;
+    cJSON_ArrayForEach(item, ids) {
+      int index = cJSON_IsString(item) && item->valuestring ? title_index(item->valuestring) : -1;
+      if (index < 0) {
+        cJSON_Delete(root);
+        return result_reply(400, 0, "Choose a supported YouTube region.");
+      }
+      title_mask |= 1u << index;
+    }
+    cJSON_Delete(root);
+  } else {
+    /* Older callers sent no body; keep blocking every installed region. */
+    for (int i = 0; i < TITLE_COUNT; i++) {
+      title_mask |= 1u << i;
+    }
+  }
+  if (title_mask == 0) {
+    return result_reply(400, 0, "Choose at least one YouTube region.");
+  }
+
   char msg[224];
-  if (appdb_block_youtube_updates(msg, sizeof msg) != 0) {
+  if (appdb_block_youtube_updates(title_mask, msg, sizeof msg) != 0) {
     return result_reply(500, 0, msg);
   }
 

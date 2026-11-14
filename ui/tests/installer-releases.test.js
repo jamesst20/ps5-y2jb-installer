@@ -84,7 +84,7 @@ test('late responses cannot replace the selected repository releases or fetch ta
 
   assert.equal(installer.activeRepo, customRepo);
   assert.deepEqual(installer.releases.map((release) => release.tag), [custom.tag]);
-  assert.equal(installer.tagFor('usa'), custom.tag);
+  assert.equal(installer.selectedDownload0Tag, custom.tag);
   installer.cache = { download0: { digest: official.digest } };
   assert.equal(installer.cacheMatches('usa'), false);
   await installer.getDownload0('usa');
@@ -106,17 +106,17 @@ test('late errors cannot erase a successfully loaded current repository', async 
   assert.equal(installer.releasesLoaded, true);
 });
 
-test('a repository change clears previous tags and cache matches before settings finish saving', async () => {
+test('a repository change clears the selected release and cache match before settings finish saving', async () => {
   const save = deferred();
   const { installer, requests } = setup({ saveSettings: () => save.promise });
   installer.releases = [official];
   installer.releasesLoaded = true;
-  installer.download0Tags = { usa: official.tag };
+  installer.download0Tag = official.tag;
   installer.cache = { download0: { digest: official.digest } };
   const current = installer.setRepo(customRepo);
 
   assert.equal(installer.activeRepo, customRepo);
-  assert.equal(installer.tagFor('usa'), '');
+  assert.equal(installer.selectedDownload0Tag, '');
   assert.equal(installer.cacheMatches('usa'), false);
   assert.equal(installer.releasesLoading, true);
   assert.equal(installer.releasesLoaded, false);
@@ -124,7 +124,7 @@ test('a repository change clears previous tags and cache matches before settings
   await settle();
   requests[0].resolve([custom]);
   await current;
-  assert.equal(installer.tagFor('usa'), custom.tag);
+  assert.equal(installer.selectedDownload0Tag, custom.tag);
 });
 
 test('an older request cannot mark the current request as finished', async () => {
@@ -158,16 +158,16 @@ test('returning to a repository still ignores its earlier request', async () => 
   requests[0].resolve([official]);
   await first;
   assert.equal(installer.activeRepo, OFFICIAL_DOWNLOAD0_REPO);
-  assert.equal(installer.tagFor('usa'), latest.tag);
+  assert.equal(installer.selectedDownload0Tag, latest.tag);
 });
 
 test('a normal refresh preserves a selected release that still exists', async () => {
   const { installer, requests } = setup();
-  installer.download0Tags = { usa: official.tag };
+  installer.download0Tag = official.tag;
   const refresh = installer.loadReleases();
   requests[0].resolve([custom, official]);
   await refresh;
-  assert.equal(installer.tagFor('usa'), official.tag);
+  assert.equal(installer.selectedDownload0Tag, official.tag);
   assert.equal(installer.releasesError, false);
   assert.equal(installer.releasesLoading, false);
   assert.equal(installer.releasesLoaded, true);
@@ -182,4 +182,39 @@ test('failure of the current request still reports an error', async () => {
   assert.equal(installer.releasesError, true);
   assert.equal(installer.releasesLoading, false);
   assert.equal(installer.releasesLoaded, true);
+});
+
+test('one release selection is shared by every region', () => {
+  const { installer } = setup();
+  installer.releases = [official, custom];
+  installer.setDownload0Tag(custom.tag);
+
+  assert.equal(installer.selectedDownload0Tag, custom.tag);
+  assert.equal(installer.download0Rows[0].cacheMatches, false);
+
+  installer.cache = { download0: { digest: custom.digest } };
+  assert.equal(installer.cacheMatches(), true);
+  assert.equal(installer.download0Rows[0].cacheMatches, true);
+
+  installer.setDownload0Tag(official.tag);
+  assert.equal(installer.selectedDownload0Tag, official.tag);
+  assert.equal(installer.cacheMatches(), false);
+});
+
+test('update blocking starts with every installed region checked', () => {
+  const { installer } = setup();
+  installer.status = {
+    youtube: {
+      regions: [
+        { title_id: 'PPSA01650', installed: true, updates: 'not_blocked' },
+      ],
+    },
+  };
+
+  assert.deepEqual(installer.installedRegions.map((row) => row.region), ['usa']);
+  assert.equal(installer.updateChecked('usa'), true);
+  assert.deepEqual(installer.selectedUpdateRows.map((row) => row.title_id), ['PPSA01650']);
+
+  installer.setUpdateChecked('usa', false);
+  assert.deepEqual(installer.selectedUpdateRows, []);
 });

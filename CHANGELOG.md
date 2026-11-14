@@ -10,7 +10,10 @@
 
 - The connection card hides the Send payload action until elfldr is found or the payload version differs, instead of showing a disabled action while disconnected.
 - Choosing a console from the scan results now closes the list, fills the address, and connects to it.
-- The setup header's cache action is now labeled Clear All Cache, and the YouTube step can delete the cached files for the selected region.
+- The setup header's cache action is now labeled Clear All Cache, and the YouTube step shows its cache path with one Delete cache action for all regions.
+- The YouTube step is now a region table with state, download, and install/reinstall actions; it stacks into two columns on narrow screens.
+- The Y2JB step now uses the same region-table layout, with one repository/release selection and Fetch/Delete cache actions above it.
+- The Block updates step is now a region table with checkboxes; Block selected updates only changes the checked regions.
 - The YouTube step explains that one region is enough and that extra regions are optional redundancy.
 
 ### Fixed

@@ -37,6 +37,8 @@ pub struct CacheStatus {
     pub download0: Option<CachedFile>,
     pub fakesignin: Option<CachedFile>,
     pub pkgs: Vec<PkgCache>,
+    /// Where YouTube builds and regions are cached, even when the directory is empty.
+    pub pkgs_path: String,
 }
 
 fn file_size(path: &Path) -> Option<u64> {
@@ -60,6 +62,7 @@ pub fn build(root: Option<PathBuf>) -> CacheStatus {
         download0: None,
         fakesignin: None,
         pkgs: Vec::new(),
+        pkgs_path: String::new(),
     };
     let Some(root) = root else {
         return status;
@@ -69,6 +72,7 @@ pub fn build(root: Option<PathBuf>) -> CacheStatus {
     status.fakesignin = cached_file(&paths::fakesignin_file(&root));
 
     let pkgs = root.join("pkgs");
+    status.pkgs_path = pkgs.display().to_string();
     if let Ok(builds) = std::fs::read_dir(&pkgs) {
         for build in builds.flatten() {
             if let Ok(regions) = std::fs::read_dir(build.path()) {
@@ -104,6 +108,7 @@ pub async fn cache_status(app: AppHandle) -> CacheStatus {
             download0: None,
             fakesignin: None,
             pkgs: Vec::new(),
+            pkgs_path: String::new(),
         })
 }
 
@@ -132,25 +137,19 @@ pub fn clear_download0_cache(app: AppHandle) -> Result<(), String> {
     }
 }
 
-fn clear_youtube_region(root: &Path, build: &str, region: &str) -> Result<(), String> {
-    match std::fs::remove_dir_all(root.join("pkgs").join(build).join(region)) {
+fn clear_youtube_cache_dir(root: &Path) -> Result<(), String> {
+    match std::fs::remove_dir_all(root.join("pkgs")) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(format!("YouTube cache: {error}")),
     }
 }
 
-/// Removes the cached YouTube files for one build/region, leaving every other cache alone.
+/// Removes every cached YouTube build and region, leaving the other caches alone.
 #[tauri::command]
-pub fn clear_youtube_cache(app: AppHandle, build: String, region: String) -> Result<(), String> {
-    if crate::manifest::build(&build)
-        .and_then(|entry| entry.sc.get(&region))
-        .is_none()
-    {
-        return Err("unknown YouTube build or region".into());
-    }
+pub fn clear_youtube_cache(app: AppHandle) -> Result<(), String> {
     let root = paths::data_dir(&app)?;
-    clear_youtube_region(&root, &build, &region)
+    clear_youtube_cache_dir(&root)
 }
 
 #[cfg(test)]
@@ -174,7 +173,7 @@ mod tests {
     }
 
     #[test]
-    fn clears_only_the_selected_youtube_region() {
+    fn clears_all_youtube_regions() {
         let root = std::env::temp_dir().join(format!("y2jb-youtube-cache-{}", std::process::id()));
         std::fs::remove_dir_all(&root).ok();
         let build = "v01.000.030";
@@ -183,10 +182,9 @@ mod tests {
         std::fs::write(usa.join("merged.pkg"), b"usa").unwrap();
         std::fs::write(europe.join("merged.pkg"), b"europe").unwrap();
 
-        clear_youtube_region(&root, build, "usa").unwrap();
+        clear_youtube_cache_dir(&root).unwrap();
 
-        assert!(!usa.exists());
-        assert!(europe.join("merged.pkg").is_file());
+        assert!(!root.join("pkgs").exists());
         std::fs::remove_dir_all(&root).ok();
     }
 }

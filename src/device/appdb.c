@@ -181,17 +181,17 @@ static int values_match(const char *path, const char *title_id) {
   return match;
 }
 
-static int installed_titles(void) {
+static int selected_installed(unsigned int title_mask) {
   int count = 0;
   for (int i = 0; i < TITLE_COUNT; i++) {
-    if (title_has_app(TITLES[i].title_id)) {
+    if ((title_mask & (1u << i)) && title_has_app(TITLES[i].title_id)) {
       count++;
     }
   }
   return count;
 }
 
-static int edit_live(char *msg, size_t cap) {
+static int edit_live(unsigned int title_mask, char *msg, size_t cap) {
   sqlite3 *db = NULL;
   if (sqlite3_open_v2(LIVE_PATH, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX, NULL) != SQLITE_OK) {
     snprintf(msg, cap, "Could not open appinfo.db for writing: %s", sqlite3_errmsg(db));
@@ -205,7 +205,7 @@ static int edit_live(char *msg, size_t cap) {
     int patched = 0;
     for (int i = 0; i < TITLE_COUNT; i++) {
       const char *title_id = TITLES[i].title_id;
-      if (!title_has_app(title_id)) {
+      if (!(title_mask & (1u << i)) || !title_has_app(title_id)) {
         continue;
       }
       if (set_value(db, title_id, "CONTENT_VERSION", BLOCKED_CONTENT_VERSION) != 0 ||
@@ -217,7 +217,7 @@ static int edit_live(char *msg, size_t cap) {
     int verified = patched > 0;
     if (verified) {
       for (int i = 0; i < TITLE_COUNT; i++) {
-        if (title_has_app(TITLES[i].title_id) &&
+        if ((title_mask & (1u << i)) && title_has_app(TITLES[i].title_id) &&
             values_match_db(db, TITLES[i].title_id) != 1) {
           verified = 0;
           break;
@@ -251,10 +251,13 @@ appdb_updates_t appdb_youtube_updates(const char *title_id) {
   return APPDB_UNKNOWN;
 }
 
-static int block_youtube_updates_locked(char *msg, size_t cap) {
-  int installed = installed_titles();
-  if (installed == 0) {
-    snprintf(msg, cap, "YouTube is not installed in any region, so there are no updates to block.");
+static int block_youtube_updates_locked(unsigned int title_mask, char *msg, size_t cap) {
+  if (title_mask == 0) {
+    snprintf(msg, cap, "Choose at least one YouTube region.");
+    return -1;
+  }
+  if (selected_installed(title_mask) == 0) {
+    snprintf(msg, cap, "The selected regions are not installed.");
     return -1;
   }
   char backup[256];
@@ -262,23 +265,24 @@ static int block_youtube_updates_locked(char *msg, size_t cap) {
     snprintf(msg, cap, "Could not back up appinfo.db to the store; nothing was changed.");
     return -1;
   }
-  if (edit_live(msg, cap) != 0) {
+  if (edit_live(title_mask, msg, cap) != 0) {
     return -1;
   }
   for (int i = 0; i < TITLE_COUNT; i++) {
     const char *title_id = TITLES[i].title_id;
-    if (title_has_app(title_id) && values_match(LIVE_PATH, title_id) != 1) {
+    if ((title_mask & (1u << i)) && title_has_app(title_id) &&
+        values_match(LIVE_PATH, title_id) != 1) {
       snprintf(msg, cap, "The YouTube rows did not read back as blocked; the backup is in the store.");
       return -1;
     }
   }
-  snprintf(msg, cap, "YouTube updates are blocked. Backup kept: %s", backup);
+  snprintf(msg, cap, "YouTube updates are blocked for the selected regions. Backup kept: %s", backup);
   return 0;
 }
 
-int appdb_block_youtube_updates(char *msg, size_t cap) {
+int appdb_block_youtube_updates(unsigned int title_mask, char *msg, size_t cap) {
   pthread_mutex_lock(&g_update_lock);
-  int rc = block_youtube_updates_locked(msg, cap);
+  int rc = block_youtube_updates_locked(title_mask, msg, cap);
   pthread_mutex_unlock(&g_update_lock);
   return rc;
 }

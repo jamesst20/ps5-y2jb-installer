@@ -69,7 +69,7 @@ export class Installer {
   releasesLoading = $state(false);
   releasesError = $state(false);
   releasesLoaded = $state(false);
-  download0Tags = $state({});
+  download0Tag = $state('');
   customRepos = $state([]);
   activeRepo = $state(OFFICIAL_DOWNLOAD0_REPO);
   transfer = $state(null);
@@ -77,6 +77,7 @@ export class Installer {
   busyRegion = $state('');
   rebootPending = $state(false);
   confirmBlock = $state(false);
+  updateSelections = $state({});
   initialized = $state(false);
   paused = $state(false);
   refreshing = $state(false);
@@ -114,6 +115,11 @@ export class Installer {
   regions = $derived(this.selectedBuild?.regions ?? []);
   latestTag = $derived(
     this.releases.find((release) => !release.prerelease)?.tag ?? this.releases[0]?.tag ?? '',
+  );
+  selectedDownload0Tag = $derived(
+    this.releases.some((release) => release.tag === this.download0Tag)
+      ? this.download0Tag
+      : this.latestTag,
   );
   releaseItems = $derived(
     this.releases.map((release) => ({
@@ -172,9 +178,7 @@ export class Installer {
         (this.status?.files?.download0 ?? []).find(
           (row) => row.title_id === entry.title_id,
         ) ?? null;
-      const selectedTag = this.tagFor(entry.region);
-      const selectedRelease =
-        this.releases.find((release) => release.tag === selectedTag) ?? null;
+      const selectedTag = this.selectedDownload0Tag;
       const cacheMatches = !!this.cacheTag && this.cacheTag === selectedTag;
       const youtube = (this.status?.youtube?.regions ?? []).find(
         (row) => row.title_id === entry.title_id,
@@ -195,17 +199,12 @@ export class Installer {
       return {
         ...entry,
         status,
-        selectedTag,
-        selectedRelease,
         cacheMatches,
         youtubeInstalled: youtube?.installed === true,
         valid,
         installedLabel,
         updateAvailable:
           valid && releaseComparable && !!version && !!this.latestTag && version !== this.latestTag,
-        upToDate:
-          valid && releaseComparable && !!version && !!this.latestTag && version === this.latestTag,
-        selectedIsLatest: !!selectedTag && selectedTag === this.latestTag,
       };
     }),
   );
@@ -222,6 +221,9 @@ export class Installer {
 
   installedRegions = $derived(
     this.youtubeRows.filter((row) => row.status?.installed === true),
+  );
+  selectedUpdateRows = $derived(
+    this.installedRegions.filter((row) => this.updateChecked(row.region)),
   );
   readyRegions = $derived(
     this.download0Rows.filter((row) => row.valid === true),
@@ -275,45 +277,23 @@ export class Installer {
     this.transfer?.label === 'fakesignin' ? this.transfer : null,
   );
 
-  tagFor = (region) => {
-    const tag = this.download0Tags[region];
-    if (tag && this.releases.some((release) => release.tag === tag)) {
-      return tag;
+  setDownload0Tag = (tag) => {
+    if (tag) {
+      this.download0Tag = tag;
     }
-    return this.latestTag;
   };
 
-  setTag = (region, tag) => {
-    if (!region || !tag) {
-      return;
-    }
-    this.download0Tags = { ...this.download0Tags, [region]: tag };
-  };
-
-  // Keep every region on a release that still exists after a repo change or refresh.
-  ensureTags = () => {
-    const latest = this.latestTag;
-    const next = { ...this.download0Tags };
-    let changed = false;
-    for (const entry of this.regions) {
-      const current = next[entry.region];
-      if (!current || !this.releases.some((release) => release.tag === current)) {
-        if (latest) {
-          next[entry.region] = latest;
-          changed = true;
-        }
-      }
-    }
-    if (changed) {
-      this.download0Tags = next;
+  // Keep the selected release valid after a repository change or the release list refresh.
+  ensureDownload0Tag = () => {
+    if (!this.download0Tag || !this.releases.some((release) => release.tag === this.download0Tag)) {
+      this.download0Tag = this.latestTag;
     }
   };
 
   titleFor = (region) => this.regions.find((entry) => entry.region === region) ?? null;
 
-  cacheMatches = (region) => {
-    const tag = this.tagFor(region);
-    return !!this.cacheTag && this.cacheTag === tag;
+  cacheMatches = () => {
+    return !!this.cacheTag && this.cacheTag === this.selectedDownload0Tag;
   };
 
   start = async () => {
@@ -417,7 +397,7 @@ export class Installer {
       const releases = await download0Releases(repo);
       if (!isCurrent()) return;
       this.releases = releases;
-      this.ensureTags();
+      this.ensureDownload0Tag();
     } catch {
       if (!isCurrent()) return;
       this.releases = [];
@@ -520,7 +500,7 @@ export class Installer {
     }
     const expected = await expectedBuild(this.status.firmware);
     this.build = expected ?? '';
-    this.ensureTags();
+    this.ensureDownload0Tag();
     this.initialized = true;
   };
 
@@ -720,7 +700,19 @@ export class Installer {
     return this.runAction('y2jb', () => removeDownload0(title.title_id));
   };
 
-  blockUpdates = () => this.runAction('updates', blockYoutubeUpdates);
+  updateChecked = (region) => this.updateSelections[region] !== false;
+
+  setUpdateChecked = (region, checked) => {
+    this.updateSelections = { ...this.updateSelections, [region]: checked };
+  };
+
+  blockUpdates = () => {
+    const titleIds = this.selectedUpdateRows.map((row) => row.title_id);
+    if (titleIds.length === 0) {
+      return;
+    }
+    return this.runAction('updates', () => blockYoutubeUpdates(titleIds));
+  };
 
   fetchAndJoin = async (region) => {
     const entry = this.titleFor(region);
@@ -790,13 +782,13 @@ export class Installer {
     }
   };
 
-  getDownload0 = async (region) => {
-    const tag = this.tagFor(region);
+  getDownload0 = async () => {
+    const tag = this.selectedDownload0Tag;
     if (!tag) {
       return;
     }
     this.busy = 'download0-fetch';
-    this.busyRegion = region;
+    this.busyRegion = '';
     this.transfer = null;
     this.clearNotice('y2jb');
     try {
@@ -820,7 +812,7 @@ export class Installer {
 
   sendDownload0 = async (region) => {
     const entry = this.titleFor(region);
-    if (!entry || !this.cacheMatches(region)) {
+    if (!entry || !this.cacheMatches()) {
       return;
     }
     this.busy = 'download0-upload';
@@ -908,22 +900,13 @@ export class Installer {
     }
   };
 
-  wipeYoutubeCache = async (region) => {
-    const entry = this.titleFor(region);
-    if (!this.build || !entry) {
-      return;
-    }
+  wipeYoutubeCache = async () => {
     this.busy = 'cache';
     this.clearNotice('youtube');
     try {
-      await clearYoutubeCache(this.build, entry.region);
-      // Only this build/region changed; leave the other regions and download0 alone.
-      this.cache = {
-        ...(this.cache ?? {}),
-        pkgs: (this.cache?.pkgs ?? []).filter(
-          (pkg) => pkg.build !== this.build || pkg.region !== entry.region,
-        ),
-      };
+      await clearYoutubeCache();
+      // Every YouTube build and region is gone; the other caches are untouched.
+      this.cache = { ...(this.cache ?? {}), pkgs: [] };
       this.notify('youtube', t.youtube.cacheDeleted);
     } catch (error) {
       this.notify('youtube', String(error), false);
@@ -950,7 +933,7 @@ export class Installer {
       this.customRepos = [...this.customRepos, slug];
     }
     this.activeRepo = slug;
-    this.download0Tags = {};
+    this.download0Tag = '';
     // Invalidate the old list and its cache matches before waiting for settings.
     this.releases = [];
     const loading = this.loadReleases();
@@ -970,6 +953,7 @@ export class Installer {
     this.initialized = false;
     this.rebootPending = false;
     this.confirmBlock = false;
+    this.updateSelections = {};
     this.transfer = null;
     this.busyRegion = '';
     this.accountSlot = '';
