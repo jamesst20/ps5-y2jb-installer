@@ -2,30 +2,26 @@
 
 ## Unreleased
 
-### Added
-
-- `POST /api/appinfo` on the payload returns a YouTube title's `appinfo.db` rows and which install paths exist, for diagnosing install detection.
+## 1.4.0 — 2026-11-14
 
 ### Changed
 
-- Internal cleanup: less state and repeated logic in the app, and the payload sends a leaner status reply.
-- The connection card hides the Send payload action until elfldr is found or the payload version differs, instead of showing a disabled action while disconnected.
-- Choosing a console from the scan results now closes the list, fills the address, and connects to it.
-- The setup header's cache action is now labeled Clear All Cache, and the YouTube step shows its cache path with one Delete cache action for all regions.
-- The YouTube step is now a region table with state, download, and install/reinstall actions; it stacks into two columns on narrow screens.
-- The Y2JB step now uses the same region-table layout, with one repository/release selection and Fetch/Delete cache actions above it.
-- The Block updates step is now a region table with checkboxes; Block selected updates only changes the checked regions.
-- The YouTube step explains that one region is enough and that extra regions are optional redundancy.
+- The console card offers one action for the current state: Connect and Scan while nothing answers, then Disconnect once elfldr or the payload is found. Send payload and Turn off payload sit below, and the address stays locked until you disconnect.
+- Choosing a console from the scan results now fills in the address and connects in one click, and closes the list.
+- The YouTube, Y2JB and Block updates steps now use a region table, so each region's state, download and install/uninstall actions are on one row; the tables stack neatly on narrow screens. The Y2JB table keeps its repository and release pickers above it, and Block selected updates only changes the ticked regions.
+- The YouTube step explains that one region is enough and extra regions are optional.
+- The setup header action is now Clear All Cache, and the YouTube step has a single Delete cache action for all regions beside the cache path.
 
 ### Fixed
 
-- Switching the `download0.dat` repository clears the previous release selection and cache match immediately. Late responses from an earlier request no longer replace the current release list, erase it with an error, or end its loading state.
-- Progress bars for large downloads and uploads now advance smoothly: transfer events are coalesced to about ten per second, while phase changes and completion are always reported.
-- YouTube installed on the M.2 SSD (or any extended storage) is now detected. The payload read `/user/app/<title>/app.pkg` only, so a console whose default install location is the M.2 SSD showed "Not installed" and "The console did not confirm the installation" after a successful install, and update blocking skipped the title. Install paths now come from `appinfo.db` (`_org_path`), with `/mnt/ext1`, `/mnt/ext0` and `/mnt/usb0` probed as fallbacks.
-- A connection refused by the console now fails immediately instead of being retried for 45 s: that means elfldr or the payload is not listening, not that the console is in a TCP stall window.
-- The app now waits out the 10–20 s windows in which a jailbroken console stops accepting TCP connections (every process on it, not only the payload). Payload sending and uploads retry the connection for up to 45 s, actions wait for the payload to answer before they are sent once, the status poll keeps trying through about 35–45 s of silence before it pauses, and a retried YouTube install for the same region is reported as already running instead of failing.
-- Uploads no longer end with "the console closed the connection without replying" on fast links: the app no longer half-closes the socket after the body, which made the payload's HTTP server drop the reply.
-- The console no longer shows as disconnected while a large upload is in progress. The payload now serves each request on its own thread, so an upload no longer monopolizes the server; the app also ignores status timeouts while a transfer it is driving is still streaming, resumes polling once the console acknowledges the upload, waits up to 180 s for the final upload reply, and gives a manual connection probe 1.5 s instead of 250 ms.
+- YouTube installed on an M.2 SSD or other extended storage is detected, so the setup no longer says "Not installed" after a successful install.
+- Switching the `download0.dat` repository no longer shows the previous repository's releases or the wrong cached release.
+- Connecting to a console with elfldr or the payload stopped now fails right away instead of retrying for 45 seconds.
+- When a jailbroken console stops accepting connections for 10–20 seconds, the app now waits it out, so sending the payload, uploading and status polling recover instead of failing.
+- Uploads no longer end with "the console closed the connection without replying".
+- The console no longer appears disconnected while a large upload is running.
+- Progress bars for large downloads and uploads now advance smoothly.
+- Smaller fixes and internal improvements under the hood.
 
 ## 1.3.0 — 2026-11-03
 
