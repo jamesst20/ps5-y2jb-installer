@@ -29,6 +29,7 @@ import {
   cacheStatus,
   clearCache,
   clearDownload0Cache,
+  clearYoutubeCache,
   uploadMerged,
   uploadDownload0,
   uploadFakesignin,
@@ -902,6 +903,30 @@ export class Installer {
       this.notify('y2jb', t.y2jb.cacheDeleted);
     } catch (error) {
       this.notify('y2jb', String(error), false);
+    } finally {
+      this.busy = '';
+    }
+  };
+
+  wipeYoutubeCache = async (region) => {
+    const entry = this.titleFor(region);
+    if (!this.build || !entry) {
+      return;
+    }
+    this.busy = 'cache';
+    this.clearNotice('youtube');
+    try {
+      await clearYoutubeCache(this.build, entry.region);
+      // Only this build/region changed; leave the other regions and download0 alone.
+      this.cache = {
+        ...(this.cache ?? {}),
+        pkgs: (this.cache?.pkgs ?? []).filter(
+          (pkg) => pkg.build !== this.build || pkg.region !== entry.region,
+        ),
+      };
+      this.notify('youtube', t.youtube.cacheDeleted);
+    } catch (error) {
+      this.notify('youtube', String(error), false);
     } finally {
       this.busy = '';
     }

@@ -34,6 +34,7 @@ export const fetchFakesignin = () => call('fetch_fakesignin');
 export const cacheStatus = () => call('cache_status');
 export const clearCache = () => call('clear_cache');
 export const clearDownload0Cache = () => call('clear_download0_cache');
+export const clearYoutubeCache = (build, region) => call('clear_youtube_cache', { build, region });
 export const uploadMerged = (ip, build, region) => call('upload_merged', { ip, build, region });
 export const uploadDownload0 = (ip, titleId) => call('upload_download0', { ip, titleId });
 export const uploadFakesignin = (ip) => call('upload_fakesignin', { ip });

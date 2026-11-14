@@ -48,6 +48,7 @@
     {/if}
 
     {#if tabs.length > 0}
+      <p class="text-xs text-muted-foreground">{t.youtube.regionHint}</p>
       <RegionTabs
         value={row?.region ?? ''}
         items={tabs}
@@ -94,30 +95,42 @@
           </Button>
         </div>
 
-        <div class="flex flex-col gap-0.5">
-          <p
-            class="text-xs {installer.cacheLoading
-              ? 'text-muted-foreground'
-              : row.cached?.merged
-                ? 'text-success'
-                : 'text-destructive'}"
-          >
-            {#if installer.cacheLoading}
-              {t.common.computing}
-            {:else if row.cached?.merged}
-              {t.youtube.cached}
-            {:else}
-              {t.common.notCached}
-            {/if}
-          </p>
-          {#if row.cached?.path}
+        <div class="flex flex-wrap items-start justify-between gap-2">
+          <div class="flex min-w-0 flex-col gap-0.5">
             <p
-              class="break-all font-mono text-[11px] {row.cached.merged
-                ? 'text-success/80'
-                : 'text-muted-foreground'}"
+              class="text-xs {installer.cacheLoading
+                ? 'text-muted-foreground'
+                : row.cached?.merged
+                  ? 'text-success'
+                  : 'text-destructive'}"
             >
-              {row.cached.path}
+              {#if installer.cacheLoading}
+                {t.common.computing}
+              {:else if row.cached?.merged}
+                {t.youtube.cached}
+              {:else}
+                {t.common.notCached}
+              {/if}
             </p>
+            {#if row.cached?.path}
+              <p
+                class="break-all font-mono text-[11px] {row.cached.merged
+                  ? 'text-success/80'
+                  : 'text-muted-foreground'}"
+              >
+                {row.cached.path}
+              </p>
+            {/if}
+          </div>
+          {#if row.cached}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={installer.busy !== ''}
+              onclick={() => installer.wipeYoutubeCache(row.region)}
+            >
+              {t.youtube.clearCache}
+            </Button>
           {/if}
         </div>
 

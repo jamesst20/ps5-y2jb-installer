@@ -10,6 +10,8 @@
 
 - The connection card hides the Send payload action until elfldr is found or the payload version differs, instead of showing a disabled action while disconnected.
 - Choosing a console from the scan results now closes the list, fills the address, and connects to it.
+- The setup header's cache action is now labeled Clear All Cache, and the YouTube step can delete the cached files for the selected region.
+- The YouTube step explains that one region is enough and that extra regions are optional redundancy.
 
 ### Fixed
 

@@ -71,7 +71,7 @@ export const strings = {
     title: 'Setup',
     done: 'Done',
     todo: 'Pending',
-    clearCache: 'Clear cache',
+    clearCache: 'Clear All Cache',
   },
 
   accounts: {
@@ -94,9 +94,13 @@ export const strings = {
     installed: 'Installed',
     region: 'Region',
     regions: { usa: 'USA', europe: 'Europe', japan: 'Japan' },
+    regionHint:
+      'Only one region is needed. Installing all three is optional redundancy in case one setup is broken.',
     fetchJoin: 'Fetch and join',
     install: 'Install',
     reinstall: 'Reinstall',
+    clearCache: 'Clear cache',
+    cacheDeleted: 'The cached YouTube files for this region were deleted.',
     installing: 'Installing…',
     installTransferring: 'Downloading to the console',
     installPromoting: 'Installing and verifying',

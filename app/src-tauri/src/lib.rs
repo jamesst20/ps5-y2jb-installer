@@ -41,6 +41,7 @@ pub fn run() {
             cache::cache_status,
             cache::clear_cache,
             cache::clear_download0_cache,
+            cache::clear_youtube_cache,
             manifest::manifest_view,
             manifest::expected_build,
             upload::upload_merged,
