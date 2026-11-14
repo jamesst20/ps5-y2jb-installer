@@ -72,7 +72,7 @@ int main(void) {
   char title_dir[256];
   snprintf(title_dir, sizeof title_dir, "%s/PPSA01651", app_root);
   CHECK(mkdir(title_dir, 0700) == 0);
-  char app_pkg[256];
+  char app_pkg[sizeof title_dir + sizeof "/app.pkg"];
   snprintf(app_pkg, sizeof app_pkg, "%s/app.pkg", title_dir);
   write_text(app_pkg, "installed youtube package");
 
