@@ -134,15 +134,17 @@ pub async fn probe(ip: String) -> Found {
     let parsed: Option<Ipv4Addr> = ip.parse().ok();
     match parsed {
         Some(address) => {
-            tauri::async_runtime::spawn_blocking(move || probe_host_with(address, SINGLE_PROBE_TIMEOUT))
+            tauri::async_runtime::spawn_blocking(move || {
+                probe_host_with(address, SINGLE_PROBE_TIMEOUT)
+            })
         }
-            .await
-            .unwrap_or(Found {
-                ip,
-                loader: false,
-                api: false,
-                alive: false,
-            }),
+        .await
+        .unwrap_or(Found {
+            ip,
+            loader: false,
+            api: false,
+            alive: false,
+        }),
         None => Found {
             ip,
             loader: false,
