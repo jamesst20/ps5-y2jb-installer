@@ -703,7 +703,6 @@ export class Installer {
       async () => {
         await uploadDownload0(this.ip, row.title_id);
         this.resumePolling();
-        this.notify('y2jb', t.y2jb.done);
       },
       { region: row.region, refresh: true },
     );

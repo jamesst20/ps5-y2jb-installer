@@ -138,6 +138,7 @@ export const strings = {
     regionMissingYouTube: 'Install this region in the YouTube step first.',
     refresh: 'Refresh',
     updateAvailable: 'Update available',
+    update: 'Update',
     fetch: 'Fetch',
     upload: 'Upload',
     uninstall: 'Uninstall',
@@ -146,7 +147,6 @@ export const strings = {
     releaseReady: (label) => `${label} is ready.`,
     releaseListUnavailable: 'Could not read the release list from GitHub.',
     releaseListEmpty: 'No download0.dat releases found in this repository.',
-    done: 'download0.dat is in place.',
     internetDetected:
       'Internet access detected on the console. Disconnect it before opening YouTube; an online launch can overwrite download0.dat and require reinstalling it.',
   },

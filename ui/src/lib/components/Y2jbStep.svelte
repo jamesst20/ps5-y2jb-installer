@@ -187,7 +187,9 @@
                 >
                   {t.y2jb.download}
                 </span>
-                {#if !installer.cache?.download0}
+                {#if installer.cacheLoading}
+                  <span class="text-xs text-muted-foreground">{t.common.computing}</span>
+                {:else if !installer.cache?.download0}
                   <span class="text-xs text-muted-foreground">{t.y2jb.fetchFirst}</span>
                 {:else if installer.cacheReady}
                   <span class="text-xs font-medium text-success">{t.y2jb.downloaded}</span>
@@ -205,26 +207,32 @@
                   {t.y2jb.action}
                 </span>
                 <div class="flex w-full flex-col gap-1.5 sm:w-auto sm:flex-row sm:justify-end">
-                  <Button
-                    size="sm"
-                    class="w-full sm:w-auto"
-                    disabled={!installer.ip ||
-                      installer.busy !== '' ||
-                      !installer.cacheReady ||
-                      !row.youtubeInstalled ||
-                      installer.jobRunning}
-                    loading={installer.busy === 'download0-upload' &&
-                      installer.busyRegion === row.region}
-                    onclick={() => installer.sendDownload0(row)}
-                  >
-                    {t.y2jb.upload}
-                  </Button>
+                  {#if !row.status?.present || row.updateAvailable}
+                    <Button
+                      size="sm"
+                      class="w-full sm:w-auto"
+                      disabled={!installer.ip ||
+                        installer.busy !== '' ||
+                        installer.cacheLoading ||
+                        !installer.cacheReady ||
+                        !row.youtubeInstalled ||
+                        installer.jobRunning}
+                      loading={installer.busy === 'download0-upload' &&
+                        installer.busyRegion === row.region}
+                      onclick={() => installer.sendDownload0(row)}
+                    >
+                      {row.updateAvailable ? t.y2jb.update : t.y2jb.upload}
+                    </Button>
+                  {/if}
                   {#if row.status?.present}
                     <Button
                       size="sm"
                       variant="outline"
                       class="w-full sm:w-auto"
-                      disabled={!installer.ip || installer.busy !== '' || installer.jobRunning}
+                      disabled={!installer.ip ||
+                        installer.busy !== '' ||
+                        installer.cacheLoading ||
+                        installer.jobRunning}
                       onclick={() => installer.removeDownload0File(row)}
                     >
                       {t.y2jb.uninstall}
