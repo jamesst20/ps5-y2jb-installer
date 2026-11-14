@@ -586,6 +586,7 @@ export class Installer {
     }
     this.ip = next;
     this.targetIp = next;
+    this.found = [];
     setApiBase(this.targetIp);
     rememberConsole(next).catch(() => {});
     this.connecting = true;

@@ -6,6 +6,11 @@
 
 - `POST /api/appinfo` on the payload returns a YouTube title's `appinfo.db` rows and which install paths exist, for diagnosing install detection.
 
+### Changed
+
+- The connection card hides the Send payload action until elfldr is found or the payload version differs, instead of showing a disabled action while disconnected.
+- Choosing a console from the scan results now closes the list, fills the address, and connects to it.
+
 ### Fixed
 
 - Switching the `download0.dat` repository clears the previous release selection and cache match immediately. Late responses from an earlier request no longer replace the current release list, erase it with an error, or end its loading state.

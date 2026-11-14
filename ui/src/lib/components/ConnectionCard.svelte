@@ -111,7 +111,9 @@
       </Alert>
     {/if}
 
-    {#if installer.payload && (!installer.reachable || installer.versionMismatch)}
+    {#if installer.payload &&
+      (installer.sending ||
+        (installer.canSendPayload && (installer.loaderVisible || installer.versionMismatch)))}
       <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
         <span class="text-xs text-muted-foreground">{t.connection.payload} · {formatBytes(installer.payload.size)}</span>
         <Button size="sm" disabled={!installer.canSendPayload} loading={installer.sending} onclick={installer.send}>
